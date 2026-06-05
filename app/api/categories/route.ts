@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase/client'
+import { getSupabaseAdmin } from '@/lib/supabase/server'
 
-// GET /api/categories - Get all unique categories for the user
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -10,17 +9,13 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token)
+    const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get all categories with counts
-    const { data: materials, error } = await supabase
+    const { data: materials, error } = await getSupabaseAdmin()
       .from('study_materials')
       .select('category')
       .eq('user_id', user.id)
@@ -30,15 +25,15 @@ export async function GET(request: NextRequest) {
       throw new Error(error.message)
     }
 
-    // Count categories
-    const categoryCounts = materials?.reduce((acc: Record<string, number>, item) => {
-      if (item.category) {
-        acc[item.category] = (acc[item.category] || 0) + 1
-      }
-      return acc
-    }, {})
+    const categoryCounts = (materials as { category: string | null }[])
+      .reduce((acc: Record<string, number>, item) => {
+        if (item.category) {
+          acc[item.category] = (acc[item.category] || 0) + 1
+        }
+        return acc
+      }, {})
 
-    const categories = Object.entries(categoryCounts || {}).map(([category, count]) => ({
+    const categories = Object.entries(categoryCounts).map(([category, count]) => ({
       category,
       count,
     }))
@@ -46,9 +41,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ categories }, { status: 200 })
   } catch (error) {
     console.error('Get categories error:', error)
-    return NextResponse.json(
-      { error: 'Failed to get categories' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to get categories' }, { status: 500 })
   }
 }
