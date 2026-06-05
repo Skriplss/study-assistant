@@ -75,9 +75,9 @@ export default function SignupForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-md">
+    <form onSubmit={handleSubmit} className="space-y-5 w-full max-w-md">
       <div>
-        <label htmlFor="name" className="block text-sm font-medium mb-1">
+        <label htmlFor="name" className="block text-sm font-semibold mb-2 text-foreground">
           Name (optional)
         </label>
         <input
@@ -85,14 +85,14 @@ export default function SignupForm() {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 border-2 border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
           placeholder="John Doe"
           disabled={isLoading}
         />
       </div>
 
       <div>
-        <label htmlFor="email" className="block text-sm font-medium mb-1">
+        <label htmlFor="email" className="block text-sm font-semibold mb-2 text-foreground">
           Email
         </label>
         <input
@@ -101,14 +101,14 @@ export default function SignupForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 border-2 border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
           placeholder="your@email.com"
           disabled={isLoading}
         />
       </div>
 
       <div>
-        <label htmlFor="password" className="block text-sm font-medium mb-1">
+        <label htmlFor="password" className="block text-sm font-semibold mb-2 text-foreground">
           Password
         </label>
         <input
@@ -117,14 +117,14 @@ export default function SignupForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 border-2 border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
           placeholder="••••••••"
           disabled={isLoading}
         />
         {password && (
-          <div className="mt-2">
+          <div className="mt-3">
             <div className="flex items-center gap-2">
-              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all ${
                     passwordStrength === 'weak'
@@ -135,25 +135,25 @@ export default function SignupForm() {
                   }`}
                 />
               </div>
-              <span className="text-xs font-medium capitalize">
+              <span className="text-xs font-semibold capitalize text-muted-foreground">
                 {passwordStrength}
               </span>
             </div>
           </div>
         )}
-        <div className="mt-2 text-xs text-gray-600 space-y-1">
-          <p className="font-medium">Password must contain:</p>
-          <ul className="list-disc list-inside space-y-0.5">
-            <li className={password.length >= 8 ? 'text-green-600' : ''}>
+        <div className="mt-3 text-xs text-muted-foreground space-y-1.5 bg-secondary/50 p-3 rounded-lg">
+          <p className="font-semibold text-foreground">Password must contain:</p>
+          <ul className="list-disc list-inside space-y-1">
+            <li className={password.length >= 8 ? 'text-green-600 dark:text-green-400 font-medium' : ''}>
               At least 8 characters
             </li>
-            <li className={/[a-z]/.test(password) ? 'text-green-600' : ''}>
+            <li className={/[a-z]/.test(password) ? 'text-green-600 dark:text-green-400 font-medium' : ''}>
               One lowercase letter
             </li>
-            <li className={/[A-Z]/.test(password) ? 'text-green-600' : ''}>
+            <li className={/[A-Z]/.test(password) ? 'text-green-600 dark:text-green-400 font-medium' : ''}>
               One uppercase letter
             </li>
-            <li className={/\d/.test(password) ? 'text-green-600' : ''}>
+            <li className={/\d/.test(password) ? 'text-green-600 dark:text-green-400 font-medium' : ''}>
               One number
             </li>
           </ul>
@@ -163,7 +163,7 @@ export default function SignupForm() {
       <div>
         <label
           htmlFor="confirmPassword"
-          className="block text-sm font-medium mb-1"
+          className="block text-sm font-semibold mb-2 text-foreground"
         >
           Confirm Password
         </label>
@@ -173,14 +173,14 @@ export default function SignupForm() {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 border-2 border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
           placeholder="••••••••"
           disabled={isLoading}
         />
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+        <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-lg text-destructive text-sm font-medium">
           {error}
         </div>
       )}
@@ -188,14 +188,14 @@ export default function SignupForm() {
       <button
         type="submit"
         disabled={isLoading || !passwordValidation.isValid}
-        className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+        className="w-full py-3 px-6 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-all font-semibold shadow-lg hover:shadow-xl"
       >
         {isLoading ? 'Creating account...' : 'Sign Up'}
       </button>
 
-      <div className="text-center text-sm">
+      <div className="text-center text-sm text-muted-foreground">
         Already have an account?{' '}
-        <a href="/auth/login" className="text-blue-600 hover:underline">
+        <a href="/auth/login" className="text-primary hover:underline font-semibold">
           Login
         </a>
       </div>

@@ -50,9 +50,9 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-md">
+    <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-md">
       <div>
-        <label htmlFor="email" className="block text-sm font-medium mb-1">
+        <label htmlFor="email" className="block text-sm font-semibold mb-2 text-foreground">
           Email
         </label>
         <input
@@ -61,14 +61,14 @@ export default function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 border-2 border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
           placeholder="your@email.com"
           disabled={isLoading}
         />
       </div>
 
       <div>
-        <label htmlFor="password" className="block text-sm font-medium mb-1">
+        <label htmlFor="password" className="block text-sm font-semibold mb-2 text-foreground">
           Password
         </label>
         <input
@@ -77,14 +77,14 @@ export default function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 border-2 border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
           placeholder="••••••••"
           disabled={isLoading}
         />
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+        <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-lg text-destructive text-sm font-medium">
           {error}
         </div>
       )}
@@ -92,7 +92,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+        className="w-full py-3 px-6 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-all font-semibold shadow-lg hover:shadow-xl"
       >
         {isLoading ? 'Logging in...' : 'Login'}
       </button>
@@ -100,15 +100,15 @@ export default function LoginForm() {
       <div className="text-center text-sm">
         <a
           href="/auth/reset-password"
-          className="text-blue-600 hover:underline"
+          className="text-primary hover:underline font-medium"
         >
           Forgot password?
         </a>
       </div>
 
-      <div className="text-center text-sm">
+      <div className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{' '}
-        <a href="/auth/signup" className="text-blue-600 hover:underline">
+        <a href="/auth/signup" className="text-primary hover:underline font-semibold">
           Sign up
         </a>
       </div>
