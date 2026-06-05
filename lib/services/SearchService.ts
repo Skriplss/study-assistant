@@ -45,6 +45,7 @@ export class SearchService {
     const results: SearchResult[] = []
 
     for (const m of materials) {
+      const materialTags = tagsByMaterial.get(m.id) || []
       const material: StudyMaterial = {
         id: m.id,
         userId: m.user_id,
@@ -57,7 +58,7 @@ export class SearchService {
         parsingStatus: m.parsing_status as 'pending' | 'processing' | 'completed' | 'failed',
         parsingError: m.parsing_error,
         category: m.category,
-        tags: tagsByMaterial.get(m.id) || [],
+        tags: materialTags,
         createdAt: m.created_at || new Date().toISOString(),
         updatedAt: m.updated_at || new Date().toISOString(),
       }

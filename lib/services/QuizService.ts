@@ -99,6 +99,7 @@ export class QuizService {
   }
 
   static async submitAnswer(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     userId: string,
     quizId: string,
     questionId: string,
