@@ -1,10 +1,11 @@
 import Groq from 'groq-sdk'
 import type { Quiz, Question, QuizConfig, AnswerVerification } from '@/lib/types'
+import { buildQuizGenerationPrompt, buildAnswerVerificationPrompt } from '@/lib/ai/quiz-prompt'
 
 export class AIService {
   static groq: Groq | null = null
   static readonly MAX_RETRIES = 3
-  static readonly TIMEOUT = 30000
+  static readonly TIMEOUT = 45000 // Increased for quiz generation
   static readonly RETRY_DELAYS = [1000, 2000, 4000]
 
   static getClient(): Groq {
@@ -24,9 +25,10 @@ export class AIService {
           setTimeout(() => reject(new Error('Timeout')), this.TIMEOUT)
         ),
       ])
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (attempt >= this.MAX_RETRIES - 1) throw error
-      if (error?.status === 429) {
+      const err = error as { status?: number }
+      if (err?.status === 429) {
         await new Promise((r) => setTimeout(r, this.RETRY_DELAYS[attempt]))
         return this.callWithRetry(fn, attempt + 1)
       }
@@ -34,32 +36,49 @@ export class AIService {
     }
   }
 
+  /**
+   * Validate quiz questions for quality
+   */
+  private static validateQuestions(questions: any[]): string[] {
+    const errors: string[] = []
+
+    questions.forEach((q, idx) => {
+      // Check for duplicate options in multiple choice
+      if (q.questionType === 'multiple_choice' && Array.isArray(q.options)) {
+        const uniqueOptions = new Set(q.options.map((o: string) => o.toLowerCase().trim()))
+        if (uniqueOptions.size < q.options.length) {
+          errors.push(`Question ${idx + 1}: Has duplicate options`)
+        }
+        if (q.options.length !== 4) {
+          errors.push(`Question ${idx + 1}: Must have exactly 4 options`)
+        }
+        // Check if correctAnswer matches one of the options
+        const hasMatchingOption = q.options.some(
+          (opt: string) => opt.trim().toLowerCase() === q.correctAnswer?.trim().toLowerCase()
+        )
+        if (!hasMatchingOption) {
+          errors.push(`Question ${idx + 1}: correctAnswer doesn't match any option`)
+        }
+      }
+
+      // Basic validation
+      if (!q.questionText || q.questionText.trim().length < 10) {
+        errors.push(`Question ${idx + 1}: Question text too short`)
+      }
+      if (!q.correctAnswer) {
+        errors.push(`Question ${idx + 1}: Missing correct answer`)
+      }
+    })
+
+    return errors
+  }
+
   static async generateQuiz(
     content: string,
-    config: QuizConfig
+    config: QuizConfig,
+    materialTitle?: string
   ): Promise<Omit<Quiz, 'id' | 'userId' | 'materialId' | 'createdAt'>> {
-    const prompt = `Generate ${config.questionCount} quiz questions from this content.
-
-Difficulty: ${config.difficulty}
-Question types: ${config.questionTypes.join(', ')}
-
-Content:
-${content.substring(0, 2000)}
-
-Return ONLY a valid JSON object (no markdown, no extra text):
-{
-  "title": "Quiz title",
-  "questions": [
-    {
-      "questionText": "Question text",
-      "questionType": "multiple_choice",
-      "difficulty": "easy",
-      "options": ["A", "B", "C", "D"],
-      "correctAnswer": "A",
-      "explanation": "reason"
-    }
-  ]
-}`
+    const prompt = buildQuizGenerationPrompt(content, config, materialTitle)
 
     return this.callWithRetry(async () => {
       const client = this.getClient()
@@ -73,13 +92,34 @@ Return ONLY a valid JSON object (no markdown, no extra text):
       const text = response.choices[0]?.message?.content
       if (!text) throw new Error('No response from AI')
 
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('No JSON found in response')
+      // Extract JSON from response
+      let jsonText = text.trim()
+      if (jsonText.startsWith('```')) {
+        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
+        jsonText = match ? match[1].trim() : jsonText
+      }
+
+      const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw new Error('No valid JSON found in response')
 
       const parsed = JSON.parse(jsonMatch[0])
 
+      // Validate questions
+      const validationErrors = this.validateQuestions(parsed.questions || [])
+      if (validationErrors.length > 0) {
+        console.warn('Quiz validation warnings:', validationErrors)
+        // Filter out invalid questions
+        parsed.questions = (parsed.questions || []).filter((_q: any, idx: number) => {
+          return !validationErrors.some(err => err.startsWith(`Question ${idx + 1}:`))
+        })
+      }
+
+      if (!parsed.questions || parsed.questions.length === 0) {
+        throw new Error('No valid questions generated')
+      }
+
       return {
-        title: parsed.title,
+        title: parsed.title || `Quiz: ${materialTitle || 'Study Material'}`,
         difficulty: config.difficulty,
         totalQuestions: parsed.questions.length,
         status: 'draft' as const,
@@ -87,10 +127,10 @@ Return ONLY a valid JSON object (no markdown, no extra text):
         questions: parsed.questions.map((q: any, i: number) => ({
           questionText: q.questionText,
           questionType: q.questionType,
-          difficulty: q.difficulty,
+          difficulty: q.difficulty || config.difficulty,
           options: q.options || null,
           correctAnswer: q.correctAnswer,
-          explanation: q.explanation,
+          explanation: q.explanation || '',
           orderIndex: i,
         })),
         completedAt: null,
@@ -104,25 +144,24 @@ Return ONLY a valid JSON object (no markdown, no extra text):
   ): Promise<AnswerVerification> {
     if (question.questionType === 'multiple_choice') {
       const correctAnswer = (question as any).correct_answer ?? question.correctAnswer
+      const isCorrect = userAnswer.trim().toLowerCase() === correctAnswer?.trim().toLowerCase()
+      
       return {
-        isCorrect: userAnswer.trim() === correctAnswer?.trim(),
-        feedback: (question as any).explanation ?? question.explanation ?? 'Check the explanation',
+        isCorrect,
+        feedback: isCorrect 
+          ? (question.explanation || 'Correct!')
+          : `Incorrect. The correct answer is: ${correctAnswer}. ${question.explanation || ''}`,
         correctAnswer,
       }
     }
 
     const correctAnswer = (question as any).correct_answer ?? question.correctAnswer
-    const prompt = `Compare the user's answer to the correct answer.
-
-Question: ${(question as any).question_text ?? question.questionText}
-Correct answer: ${correctAnswer}
-User answer: ${userAnswer}
-
-Return ONLY a JSON object:
-{
-  "isCorrect": true or false,
-  "feedback": "explanation"
-}`
+    const prompt = buildAnswerVerificationPrompt(
+      (question as any).question_text ?? question.questionText,
+      correctAnswer,
+      userAnswer,
+      question.questionType
+    )
 
     return this.callWithRetry(async () => {
       const client = this.getClient()
@@ -136,7 +175,13 @@ Return ONLY a JSON object:
       const text = response.choices[0]?.message?.content
       if (!text) throw new Error('No response from AI')
 
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      let jsonText = text.trim()
+      if (jsonText.startsWith('```')) {
+        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
+        jsonText = match ? match[1].trim() : jsonText
+      }
+
+      const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON found')
 
       const parsed = JSON.parse(jsonMatch[0])

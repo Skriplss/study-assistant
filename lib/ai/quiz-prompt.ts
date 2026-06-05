@@ -17,33 +17,69 @@ export function buildQuizGenerationPrompt(
       ? config.questionTypes.join(', ')
       : 'multiple_choice, open_ended'
 
-  return `You are an expert educator. Generate a study quiz from the material below.
+  return `You are an expert educator creating a high-quality educational quiz. Generate clear, meaningful questions that test real understanding.
 
 Material title: ${materialTitle ?? 'Untitled'}
 Question count: ${config.questionCount}
 Overall difficulty preference: ${config.difficulty}
 Question types to include: ${types}
 
-Rules:
+CRITICAL RULES:
 - Return ONLY valid JSON, no markdown fences or extra text.
 - Generate exactly ${config.questionCount} questions.
-- For multiple_choice: provide exactly 4 options and set correctAnswer to the exact text of the correct option.
-- For open_ended: set options to null and correctAnswer to a concise model answer.
-- Assign each question difficulty: easy, medium, or hard.
-- If difficulty is "mixed", vary difficulties across questions.
-- Base questions strictly on the provided material.
 
-JSON schema:
+WHAT TO AVOID (DO NOT create questions about):
+- Authors, writers, or who wrote something
+- Publication dates, years, or when something was written
+- Publishers, editors, or sources
+- Book titles, chapter titles, or document metadata
+- Page numbers or document structure
+- Trivial or obvious information
+- Information not present in the material
+
+WHAT TO FOCUS ON (Create questions about):
+- Key concepts and definitions
+- Main ideas and arguments
+- Processes, methods, and procedures
+- Cause and effect relationships
+- Applications and practical examples
+- Problem-solving and analysis
+- Comparisons and contrasts
+- Important facts and data from the content
+
+QUESTION QUALITY REQUIREMENTS:
+- Questions must be clear, specific, and unambiguous
+- Questions must test understanding, not just memorization
+- Questions must be answerable from the provided material
+- Each question must be unique and test different knowledge
+
+MULTIPLE CHOICE REQUIREMENTS:
+- Provide exactly 4 distinct options
+- ALL 4 options must be DIFFERENT from each other
+- Options should be plausible but only one correct
+- Avoid options like "All of the above" or "None of the above"
+- Make distractors (wrong answers) realistic but clearly incorrect
+- correctAnswer must match one option EXACTLY
+
+OPEN-ENDED REQUIREMENTS:
+- Set options to null
+- Provide a concise, clear model answer as correctAnswer
+- Model answer should be 1-3 sentences
+
+FORMAT:
 {
-  "title": "string",
+  "title": "Quiz: ${materialTitle ?? 'Study Material'}",
+  "difficulty": "${config.difficulty}",
+  "totalQuestions": ${config.questionCount},
   "questions": [
     {
-      "questionText": "string",
+      "questionText": "string (clear, specific question)",
       "questionType": "multiple_choice" | "open_ended",
       "difficulty": "easy" | "medium" | "hard",
-      "options": ["string"] | null,
-      "correctAnswer": "string",
-      "explanation": "string"
+      "options": ["option1", "option2", "option3", "option4"] | null,
+      "correctAnswer": "string (must match one option exactly for MC)",
+      "explanation": "string (why this is the correct answer)",
+      "orderIndex": 0
     }
   ]
 }
