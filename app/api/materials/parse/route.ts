@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         'extracted.txt'
       )
       await supabase.storage
-        .from('materials')
+        .from('study-materials')
         .upload(extractedPath, parsedContent.text, {
           contentType: 'text/plain',
           upsert: true,
