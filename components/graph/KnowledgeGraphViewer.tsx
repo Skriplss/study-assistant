@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import ReactFlow, {
   Node,
   Edge,
@@ -125,6 +125,9 @@ export function KnowledgeGraphViewer() {
 
   const handlePaneClick = useCallback(() => setTooltip(null), [])
 
+  const nodeTypes = useMemo(() => ({}), [])
+  const edgeTypes = useMemo(() => ({}), [])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -174,6 +177,8 @@ export function KnowledgeGraphViewer() {
               onEdgesChange={onEdgesChange}
               onNodeClick={handleNodeClick}
               onPaneClick={handlePaneClick}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               fitView
               minZoom={0.3}
               maxZoom={2}
