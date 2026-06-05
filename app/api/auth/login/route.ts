@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user profile
-    const { data: profile } = await supabase
+    const { data: profile } = await getSupabaseAdmin()
       .from('user_profiles')
       .select('*')
       .eq('id', data.user.id)

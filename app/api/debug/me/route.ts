@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const supabaseResult = await getSupabaseAdmin().auth.getUser(token).catch((e) => ({ error: e }))
     const adminResult = await supabaseAdmin.auth.getUser(token).catch((e) => ({ error: e }))
 
-    return NextResponse.json({ supabase: supabaseResult, supabaseAdmin: adminResult }, { status: 200 })
+  return NextResponse.json({ supabaseAdminResult: supabaseResult, supabaseAdmin: adminResult }, { status: 200 })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
