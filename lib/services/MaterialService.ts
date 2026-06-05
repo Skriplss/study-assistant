@@ -111,7 +111,7 @@ export class MaterialService {
       userId: material.user_id,
       title: material.title,
       fileName: material.file_name,
-      fileType: material.file_type,
+      fileType: material.file_type as 'pdf' | 'txt' | 'md',      
       fileSize: material.file_size,
       filePath: material.file_path,
       parsedContent: material.parsed_content,
