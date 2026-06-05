@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/materials', label: 'Materials' },
   { href: '/materials/upload', label: 'Upload' },
+  { href: '/graph', label: 'Graph' },
 ]
 
 export default function DashboardNav() {

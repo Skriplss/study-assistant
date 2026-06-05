@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
-import type { StudyMaterial } from '@/lib/types'
+import type { StudyMaterial, SearchResult } from '@/lib/types'
 import MaterialCard from './MaterialCard'
+import { SearchBar } from './SearchBar'
 
 export default function MaterialsList() {
   const { session } = useAuth()
   const [materials, setMaterials] = useState<StudyMaterial[]>([])
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -63,6 +65,14 @@ export default function MaterialsList() {
     window.location.href = `/quizzes/generate?materialId=${materialId}`
   }
 
+  const handleSearchResults = (results: SearchResult[]) => {
+    setSearchResults(results)
+  }
+
+  const displayMaterials = searchResults 
+    ? searchResults.map(r => r.material) 
+    : materials
+
   if (loading) {
     return (
       <p className="text-center text-gray-500 py-12">Loading materials…</p>
@@ -81,25 +91,45 @@ export default function MaterialsList() {
         </Link>
       </div>
 
+      <SearchBar onResults={handleSearchResults} />
+
+      {searchResults && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-600">
+            Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+          </p>
+          <button
+            onClick={() => setSearchResults(null)}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Clear search
+          </button>
+        </div>
+      )}
+
       {error && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
           {error}
         </p>
       )}
 
-      {materials.length === 0 ? (
+      {displayMaterials.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-gray-300 rounded-lg">
-          <p className="text-gray-600 mb-4">No materials yet.</p>
-          <Link
-            href="/materials/upload"
-            className="text-blue-600 hover:underline font-medium"
-          >
-            Upload your first file
-          </Link>
+          <p className="text-gray-600 mb-4">
+            {searchResults ? 'No materials found' : 'No materials yet.'}
+          </p>
+          {!searchResults && (
+            <Link
+              href="/materials/upload"
+              className="text-blue-600 hover:underline font-medium"
+            >
+              Upload your first file
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid gap-4">
-          {materials.map((material) => (
+          {displayMaterials.map((material) => (
             <MaterialCard
               key={material.id}
               material={material}

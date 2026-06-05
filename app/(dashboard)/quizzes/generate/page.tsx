@@ -1,29 +1,38 @@
 'use client'
 
 import { Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import QuizGenerator from '@/components/quizzes/QuizGenerator'
 
 function QuizGenerateContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const materialId = searchParams.get('materialId')
 
+  if (!materialId) {
+    return (
+      <div className="space-y-4 max-w-lg">
+        <h1 className="text-2xl font-bold">Quiz generation</h1>
+        <p className="text-gray-600">No material selected.</p>
+        <Link href="/materials" className="text-blue-600 hover:underline text-sm">
+          ← Back to materials
+        </Link>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-4 max-w-lg">
-      <h1 className="text-2xl font-bold">Quiz generation</h1>
-      <p className="text-gray-600">
-        The AI service is ready. Quiz configuration UI and persistence (task 8)
-        will connect here next.
-      </p>
-      {materialId && (
-        <p className="text-sm text-gray-500">
-          Material ID:{' '}
-          <code className="bg-gray-100 px-1 rounded">{materialId}</code>
-        </p>
-      )}
-      <Link href="/materials" className="text-blue-600 hover:underline text-sm">
-        ← Back to materials
-      </Link>
+    <div className="max-w-lg space-y-4">
+      <div className="flex items-center gap-4">
+        <Link href="/materials" className="text-blue-600 hover:underline text-sm">
+          ← Back to materials
+        </Link>
+      </div>
+      <QuizGenerator
+        materialId={materialId}
+        onQuizGenerated={(quizId) => router.push(`/quizzes/${quizId}`)}
+      />
     </div>
   )
 }

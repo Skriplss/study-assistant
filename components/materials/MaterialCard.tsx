@@ -51,12 +51,54 @@ export default function MaterialCard({
   const [categorySuggestions, setCategorySuggestions] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [isParsing, setIsParsing] = useState(false)
+  const [currentMaterial, setCurrentMaterial] = useState(material)
 
   useEffect(() => {
     setTitle(material.title)
     setCategory(material.category ?? '')
     setTags(material.tags)
+    setCurrentMaterial(material)
   }, [material])
+
+  const handleParse = async () => {
+    if (!session) return
+    setIsParsing(true)
+    try {
+      const response = await fetch('/api/materials/parse', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ materialId: currentMaterial.id }),
+      })
+      if (response.ok) {
+        // Reload material from server to get fresh parsingStatus
+        const res = await fetch(`/api/materials/${currentMaterial.id}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          console.log('Reloaded material:', data.material?.parsingStatus)
+          const updated = data.material ?? { ...currentMaterial, parsingStatus: 'completed' as const }
+          setCurrentMaterial(updated)
+          onEdit?.(updated)
+        } else {
+          const updated = { ...currentMaterial, parsingStatus: 'completed' as const }
+          setCurrentMaterial(updated)
+          onEdit?.(updated)
+        }
+      } else {
+        const err = await response.json()
+        console.error('Parse failed:', err)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsParsing(false)
+    }
+  }
 
   useEffect(() => {
     if (!isEditing || !session) return
@@ -144,22 +186,22 @@ export default function MaterialCard({
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
             />
           ) : (
-            <h3 className="font-semibold text-lg truncate">{material.title}</h3>
+            <h3 className="font-semibold text-lg truncate">{currentMaterial.title}</h3>
           )}
           <p className="text-sm text-gray-500 mt-1">
-            {FILE_TYPE_LABELS[material.fileType]} · {formatFileSize(material.fileSize)} ·{' '}
-            Uploaded {formatDate(material.createdAt)}
+            {FILE_TYPE_LABELS[currentMaterial.fileType]} · {formatFileSize(currentMaterial.fileSize)} ·{' '}
+            Uploaded {formatDate(currentMaterial.createdAt)}
           </p>
         </div>
 
         {!isEditing && (
           <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded">
-            {FILE_TYPE_LABELS[material.fileType]}
+            {FILE_TYPE_LABELS[currentMaterial.fileType]}
           </span>
         )}
       </div>
 
-      <ParsingStatus material={material} />
+      <ParsingStatus material={currentMaterial} />
 
       {isEditing ? (
         <div className="space-y-3">
@@ -239,16 +281,28 @@ export default function MaterialCard({
             >
               Edit
             </button>
+            {currentMaterial.parsingStatus !== 'completed' && (
+              <button
+                type="button"
+                onClick={handleParse}
+                disabled={isParsing || currentMaterial.parsingStatus === 'processing'}
+                className="px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
+              >
+                {isParsing || currentMaterial.parsingStatus === 'processing' ? 'Parsing…' : 'Parse'}
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => onGenerateQuiz(material.id)}
-              className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              onClick={() => onGenerateQuiz(currentMaterial.id)}
+              disabled={currentMaterial.parsingStatus !== 'completed'}
+              className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              title={currentMaterial.parsingStatus !== 'completed' ? 'Parse the file first' : ''}
             >
               Generate quiz
             </button>
             <button
               type="button"
-              onClick={() => onDelete(material.id)}
+              onClick={() => onDelete(currentMaterial.id)}
               className="px-3 py-2 text-sm text-red-600 border border-red-200 rounded-md hover:bg-red-50 ml-auto"
             >
               Delete

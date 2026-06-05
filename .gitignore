@@ -35,4 +35,25 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Kiro IDE
 /.kiro
+
+# SWC
+/.swc
+
+# IDEs
+/.vscode
+/.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+/coverage
+*.lcov
+supabase/.temp/

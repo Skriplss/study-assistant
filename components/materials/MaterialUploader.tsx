@@ -110,6 +110,20 @@ export default function MaterialUploader({
   
       const { material } = await response.json()
       setUploadProgress(100)
+
+      // Auto-parse after upload
+      try {
+        await fetch('/api/materials/parse', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ materialId: material.id }),
+        })
+      } catch {
+        // Parse can be triggered manually later
+      }
   
       setFile(null)
       setTitle('')

@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       .insert({
         id: data.user.id,
         preferences: {},
-      } as any)
+      })
 
     if (profileError) {
       console.error('Profile creation error:', profileError)
