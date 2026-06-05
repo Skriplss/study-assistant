@@ -1,12 +1,28 @@
 import Link from 'next/link'
-import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard'
+import dynamic from 'next/dynamic'
+
+const AnalyticsDashboard = dynamic(
+  () => import('@/components/analytics/AnalyticsDashboard').then(mod => ({ default: mod.AnalyticsDashboard })),
+  {
+    loading: () => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-card rounded-xl p-6 border border-border animate-pulse">
+            <div className="h-4 bg-muted rounded w-1/2 mb-4"></div>
+            <div className="h-8 bg-muted rounded w-3/4"></div>
+          </div>
+        ))}
+      </div>
+    ),
+  }
+)
 
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Welcome back</h1>
-        <p className="text-gray-600 max-w-xl">
+        <h1 className="text-3xl font-bold text-foreground">Welcome back</h1>
+        <p className="text-muted-foreground mt-2 max-w-xl">
           Upload study materials, organize them with tags and categories, and
           generate AI-powered quizzes once your files are parsed.
         </p>
@@ -15,19 +31,19 @@ export default function DashboardPage() {
       <div className="flex flex-wrap gap-3">
         <Link
           href="/materials"
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+          className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-semibold shadow-md transition-all"
         >
           View materials
         </Link>
         <Link
           href="/materials/upload"
-          className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium"
+          className="px-5 py-2.5 border-2 border-border bg-card text-foreground rounded-lg hover:bg-accent text-sm font-medium transition-all"
         >
           Upload new file
         </Link>
         <Link
           href="/graph"
-          className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium"
+          className="px-5 py-2.5 border-2 border-border bg-card text-foreground rounded-lg hover:bg-accent text-sm font-medium transition-all"
         >
           Knowledge Graph
         </Link>
