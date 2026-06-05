@@ -69,11 +69,11 @@ export default function QuizGenerator({
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold">Generate Quiz</h2>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-foreground">Generate Quiz</h2>
 
       <div>
-        <label className="block text-sm font-medium mb-2">
+        <label className="block text-sm font-semibold mb-3 text-foreground">
           Number of Questions: {questionCount}
         </label>
         <input
@@ -83,21 +83,21 @@ export default function QuizGenerator({
           value={questionCount}
           onChange={(e) => setQuestionCount(Number(e.target.value))}
           disabled={isGenerating}
-          className="w-full"
+          className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
         />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
+        <div className="flex justify-between text-xs text-muted-foreground mt-2">
           <span>5</span>
           <span>50</span>
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Difficulty</label>
+        <label className="block text-sm font-semibold mb-3 text-foreground">Difficulty</label>
         <select
           value={difficulty}
           onChange={(e) => setDifficulty(e.target.value as 'easy' | 'medium' | 'hard' | 'mixed')}
           disabled={isGenerating}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          className="w-full px-4 py-3 border-2 border-border bg-card text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
         >
           <option value="easy">Easy</option>
           <option value="medium">Medium</option>
@@ -107,42 +107,42 @@ export default function QuizGenerator({
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Question Types</label>
-        <div className="space-y-2">
-          <label className="flex items-center">
+        <label className="block text-sm font-semibold mb-3 text-foreground">Question Types</label>
+        <div className="space-y-3">
+          <label className="flex items-center p-3 border-2 border-border bg-card rounded-lg cursor-pointer hover:bg-accent transition-colors">
             <input
               type="checkbox"
               checked={questionTypes.includes('multiple_choice')}
               onChange={() => toggleQuestionType('multiple_choice')}
               disabled={isGenerating}
-              className="mr-2"
+              className="mr-3 w-5 h-5 accent-primary"
             />
-            Multiple Choice
+            <span className="text-foreground font-medium">Multiple Choice</span>
           </label>
-          <label className="flex items-center">
+          <label className="flex items-center p-3 border-2 border-border bg-card rounded-lg cursor-pointer hover:bg-accent transition-colors">
             <input
               type="checkbox"
               checked={questionTypes.includes('open_ended')}
               onChange={() => toggleQuestionType('open_ended')}
               disabled={isGenerating}
-              className="mr-2"
+              className="mr-3 w-5 h-5 accent-primary"
             />
-            Open Ended
+            <span className="text-foreground font-medium">Open Ended</span>
           </label>
         </div>
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+        <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-lg text-destructive text-sm font-medium">
           {error}
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         <button
           onClick={handleGenerate}
           disabled={isGenerating || questionCount < 5 || questionCount > 50}
-          className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+          className="flex-1 py-3 px-6 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground font-semibold shadow-lg hover:shadow-xl transition-all"
         >
           {isGenerating ? 'Generating...' : 'Generate Quiz'}
         </button>
@@ -150,7 +150,7 @@ export default function QuizGenerator({
           <button
             onClick={onClose}
             disabled={isGenerating}
-            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+            className="px-6 py-3 border-2 border-border bg-card text-foreground rounded-lg hover:bg-accent disabled:opacity-50 font-medium transition-all"
           >
             Cancel
           </button>
