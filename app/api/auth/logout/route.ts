@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase/client'
+import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { clearSessionCookies } from '@/lib/auth/session-cookies'
 
 export async function POST() {
   try {
-    const { error } = await supabase.auth.signOut()
+    const { error } = await getSupabaseAdmin().auth.signOut()
 
     if (error) {
       console.error('Logout error:', error)

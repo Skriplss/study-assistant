@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase/client'
+import { getSupabaseAdmin } from '@/lib/supabase/server'
 
 // GET /api/tags - Get all unique tags for the user
 export async function GET(request: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser(token)
+    } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     const query = request.nextUrl.searchParams.get('q')?.trim().toLowerCase()
 
-    const { data: materials, error: materialsError } = await supabase
+    const { data: materials, error: materialsError } = await getSupabaseAdmin()
       .from('study_materials')
       .select('id')
       .eq('user_id', user.id)
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ tags: [] }, { status: 200 })
     }
 
-    const { data: tags, error } = await supabase
+    const { data: tags, error } = await getSupabaseAdmin()
       .from('material_tags')
       .select('tag, material_id')
       .in('material_id', materialIds)

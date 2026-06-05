@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { MaterialParser } from '@/lib/services/MaterialParser'
 import { MaterialService } from '@/lib/services/MaterialService'
-import { supabase } from '@/lib/supabase/client'
+import { getSupabaseAdmin } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   let _materialId: string | undefined = undefined
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser(token)
+    } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Update status to processing
-    await supabase
+    const db = getSupabaseAdmin()
+    await db
       .from('study_materials')
       .update({ parsing_status: 'processing' })
       .eq('id', materialId)
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Update database with parsed content
-      const { error: updateError } = await supabase
+      const { error: updateError } = await db
         .from('study_materials')
         .update({
           parsed_content: parsedContent.text,
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
         /original\.\w+$/,
         'extracted.txt'
       )
-      await supabase.storage
+      await db.storage
         .from('study-materials')
         .upload(extractedPath, parsedContent.text, {
           contentType: 'text/plain',
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
           ? parseError.message
           : 'Unknown parsing error'
 
-      await supabase
+      await db
         .from('study_materials')
         .update({
           parsing_status: 'failed',

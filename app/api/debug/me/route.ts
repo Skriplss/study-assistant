@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase/client'
+import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.replace('Bearer ', '')
 
-    const supabaseResult = await supabase.auth.getUser(token).catch((e) => ({ error: e }))
+    const supabaseResult = await getSupabaseAdmin().auth.getUser(token).catch((e) => ({ error: e }))
     const adminResult = await supabaseAdmin.auth.getUser(token).catch((e) => ({ error: e }))
 
     return NextResponse.json({ supabase: supabaseResult, supabaseAdmin: adminResult }, { status: 200 })
