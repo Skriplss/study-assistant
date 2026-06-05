@@ -335,3 +335,60 @@ CREATE TRIGGER update_study_materials_updated_at BEFORE UPDATE ON study_material
 
 CREATE TRIGGER update_material_connections_updated_at BEFORE UPDATE ON material_connections
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+-- Analytics functions
+CREATE OR REPLACE FUNCTION get_performance_by_tag(
+  p_user_id UUID,
+  p_start_date TIMESTAMPTZ
+)
+RETURNS TABLE (
+  tag TEXT,
+  average_score NUMERIC,
+  quiz_count BIGINT,
+  question_count BIGINT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    unnest(sm.tags) as tag,
+    AVG(ps.score) as average_score,
+    COUNT(DISTINCT ps.quiz_id) as quiz_count,
+    SUM(q.total_questions) as question_count
+  FROM progress_snapshots ps
+  JOIN quizzes q ON ps.quiz_id = q.id
+  JOIN study_materials sm ON ps.material_id = sm.id
+  WHERE ps.user_id = p_user_id
+    AND ps.snapshot_date >= p_start_date
+    AND sm.tags IS NOT NULL
+    AND array_length(sm.tags, 1) > 0
+  GROUP BY unnest(sm.tags);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_performance_by_category(
+  p_user_id UUID,
+  p_start_date TIMESTAMPTZ
+)
+RETURNS TABLE (
+  category TEXT,
+  average_score NUMERIC,
+  quiz_count BIGINT,
+  question_count BIGINT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    sm.category,
+    AVG(ps.score) as average_score,
+    COUNT(DISTINCT ps.quiz_id) as quiz_count,
+    SUM(q.total_questions) as question_count
+  FROM progress_snapshots ps
+  JOIN quizzes q ON ps.quiz_id = q.id
+  JOIN study_materials sm ON ps.material_id = sm.id
+  WHERE ps.user_id = p_user_id
+    AND ps.snapshot_date >= p_start_date
+    AND sm.category IS NOT NULL
+  GROUP BY sm.category;
+END;
+$$ LANGUAGE plpgsql;
