@@ -24,7 +24,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = (await params) as { id: string }
+    const { id } = await params
     const material = await MaterialService.getMaterial(id)
 
     // Check authorization
@@ -39,7 +39,8 @@ export async function GET(
       { error: 'Material not found' },
       { status: 404 }
     )
-        const material = await MaterialService.getMaterial(params.id)
+  }
+}
 
 // PUT /api/materials/:id - Update material
 export async function PUT(
@@ -64,7 +65,7 @@ export async function PUT(
     }
 
     // Check authorization
-    const { id } = (await params) as { id: string }
+    const { id } = await params
     const existingMaterial = await MaterialService.getMaterial(id)
     if (existingMaterial.userId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -74,12 +75,16 @@ export async function PUT(
     const body = await request.json()
     const { title, category, tags } = body
 
+    console.log('Update request body:', { title, category, tags })
+
     // Update material
     const material = await MaterialService.updateMaterial(id, {
       title,
       category,
-        const existingMaterial = await MaterialService.getMaterial(params.id)
-        if (existingMaterial.userId !== user.id) {
+      tags,
+    })
+
+    console.log('Updated material:', material)
 
     return NextResponse.json({ material }, { status: 200 })
   } catch (error) {
@@ -88,7 +93,7 @@ export async function PUT(
       error instanceof Error ? error.message : 'Failed to update material'
     return NextResponse.json({ error: message }, { status: 500 })
   }
-        const material = await MaterialService.updateMaterial(params.id, {
+}
 
 // DELETE /api/materials/:id - Delete material
 export async function DELETE(
@@ -113,7 +118,7 @@ export async function DELETE(
     }
 
     // Check authorization
-    const { id } = (await params) as { id: string }
+    const { id } = await params
     const material = await MaterialService.getMaterial(id)
     if (material.userId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

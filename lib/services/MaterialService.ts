@@ -187,7 +187,10 @@ export class MaterialService {
       throw new Error(`Update failed: ${error.message}`)
     }
 
-    if (updates.tags) {
+    // Update tags if provided (even if empty array to clear tags)
+    if (updates.tags !== undefined) {
+      console.log('Updating tags:', updates.tags)
+      
       await db.from('material_tags').delete().eq('material_id', materialId)
 
       if (updates.tags.length > 0) {
@@ -195,8 +198,16 @@ export class MaterialService {
           material_id: materialId,
           tag: tag.trim().toLowerCase(),
         }))
-        await db.from('material_tags').insert(tagData)
+        console.log('Inserting tags:', tagData)
+        
+        const { error: tagError } = await db.from('material_tags').insert(tagData)
+        if (tagError) {
+          console.error('Tag insert error:', tagError)
+          throw new Error(`Failed to insert tags: ${tagError.message}`)
+        }
       }
+    } else {
+      console.log('Tags not provided in update')
     }
 
     return this.getMaterial(materialId)
