@@ -73,11 +73,11 @@ export function AnalyticsDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
+        <h2 className="text-2xl font-bold text-foreground">Analytics Dashboard</h2>
         <select
           value={timeRange}
           onChange={(e) => setTimeRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
-          className="px-4 py-2 border border-gray-300 rounded"
+          className="px-4 py-2 border-2 border-border bg-card text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>
@@ -87,59 +87,73 @@ export function AnalyticsDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-600">Total Materials</div>
-          <div className="text-3xl font-bold">{data.totalMaterials}</div>
+        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+          <div className="text-sm text-muted-foreground font-medium">Total Materials</div>
+          <div className="text-3xl font-bold text-foreground mt-2">{data.totalMaterials}</div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-600">Total Quizzes</div>
-          <div className="text-3xl font-bold">{data.totalQuizzes}</div>
+        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+          <div className="text-sm text-muted-foreground font-medium">Total Quizzes</div>
+          <div className="text-3xl font-bold text-foreground mt-2">{data.totalQuizzes}</div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-600">Total Questions</div>
-          <div className="text-3xl font-bold">{data.totalQuestions}</div>
+        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+          <div className="text-sm text-muted-foreground font-medium">Total Questions</div>
+          <div className="text-3xl font-bold text-foreground mt-2">{data.totalQuestions}</div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-600">Average Score</div>
-          <div className="text-3xl font-bold">{data.averageScore}%</div>
+        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+          <div className="text-sm text-muted-foreground font-medium">Average Score</div>
+          <div className="text-3xl font-bold text-primary mt-2">{data.averageScore}%</div>
         </div>
       </div>
 
       {scoreChartData.length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Score History</h3>
+        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Score History</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={scoreChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis domain={[0, 100]} />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+              <XAxis dataKey="date" stroke="rgb(var(--muted-foreground))" />
+              <YAxis domain={[0, 100]} stroke="rgb(var(--muted-foreground))" />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'rgb(var(--card))', 
+                  border: '1px solid rgb(var(--border))',
+                  borderRadius: '8px',
+                  color: 'rgb(var(--foreground))'
+                }} 
+              />
               <Legend />
-              <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} />
+              <Line type="monotone" dataKey="score" stroke="rgb(var(--primary))" strokeWidth={3} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       )}
 
       {tagChartData.length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Performance by Tag</h3>
+        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Performance by Tag</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={tagChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis domain={[0, 100]} />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+              <XAxis dataKey="name" stroke="rgb(var(--muted-foreground))" />
+              <YAxis domain={[0, 100]} stroke="rgb(var(--muted-foreground))" />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'rgb(var(--card))', 
+                  border: '1px solid rgb(var(--border))',
+                  borderRadius: '8px',
+                  color: 'rgb(var(--foreground))'
+                }} 
+              />
               <Legend />
-              <Bar dataKey="score" fill="#3b82f6" />
+              <Bar dataKey="score" fill="rgb(var(--primary))" />
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
 
       {categoryChartData.length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Performance by Category</h3>
+        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Performance by Category</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -156,7 +170,14 @@ export function AnalyticsDashboard() {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'rgb(var(--card))', 
+                  border: '1px solid rgb(var(--border))',
+                  borderRadius: '8px',
+                  color: 'rgb(var(--foreground))'
+                }} 
+              />
             </PieChart>
           </ResponsiveContainer>
         </div>
