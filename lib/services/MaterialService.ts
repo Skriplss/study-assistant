@@ -51,12 +51,24 @@ export class MaterialService {
  
     try {
       if (onProgress) onProgress(10)
+
+      // Check if bucket exists and is accessible
+      const { data: buckets, error: bucketsError } = await db.storage.listBuckets()
+      if (bucketsError) {
+        throw new Error(`Storage not accessible: ${bucketsError.message}. Please check Supabase Storage configuration.`)
+      }
+      
+      const bucketExists = buckets?.some(b => b.name === this.STORAGE_BUCKET)
+      if (!bucketExists) {
+        throw new Error(`Storage bucket "${this.STORAGE_BUCKET}" does not exist. Please create it in Supabase Dashboard under Storage.`)
+      }
  
       const { error: uploadError } = await db.storage
         .from(this.STORAGE_BUCKET)
         .upload(filePath, file, { cacheControl: '3600', upsert: false })
  
       if (uploadError) {
+        console.error('Storage upload error:', uploadError)
         throw new Error(`Upload failed: ${uploadError.message}`)
       }
  
@@ -100,7 +112,12 @@ export class MaterialService {
  
       return this.getMaterial(materialId)
     } catch (error) {
-      await db.storage.from(this.STORAGE_BUCKET).remove([filePath])
+      // Clean up on error
+      try {
+        await db.storage.from(this.STORAGE_BUCKET).remove([filePath])
+      } catch {
+        // Ignore cleanup errors
+      }
       throw error
     }
   }
