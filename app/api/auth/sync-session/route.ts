@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       expires_in: expires_in ?? 3600,
       token_type: 'bearer',
       user: null,
-    } as Session
+    } as unknown as Session
 
     const response = NextResponse.json({ message: 'Session synced' })
     return applySessionCookies(response, session)
