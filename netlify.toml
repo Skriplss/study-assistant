@@ -17,3 +17,14 @@
 
 [functions]
   node_bundler = "esbuild"
+  # Increase payload limit for file uploads
+  included_files = ["**/*"]
+  
+[[functions]]
+  # Increase size limit for API routes handling uploads
+  path = "/api/*"
+  node_bundler = "esbuild"
+  
+[functions."api/*"]
+  # Max function size for uploads
+  max_duration = 60
