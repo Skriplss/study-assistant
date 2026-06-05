@@ -1,21 +1,23 @@
-import { MaterialService } from '../MaterialService'
+import { validateMaterialFile } from '@/lib/materials/file-validation'
 
-describe('MaterialService.validateFile', () => {
+const validateFile = validateMaterialFile
+
+describe('validateMaterialFile', () => {
   it('should validate a valid PDF file', () => {
     const file = new File(['test'], 'test.pdf', { type: 'application/pdf' })
-    const result = MaterialService.validateFile(file)
+    const result = validateFile(file)
     expect(result.valid).toBe(true)
   })
 
   it('should validate a valid TXT file', () => {
     const file = new File(['test'], 'test.txt', { type: 'text/plain' })
-    const result = MaterialService.validateFile(file)
+    const result = validateFile(file)
     expect(result.valid).toBe(true)
   })
 
   it('should validate a valid MD file', () => {
     const file = new File(['test'], 'test.md', { type: 'text/markdown' })
-    const result = MaterialService.validateFile(file)
+    const result = validateFile(file)
     expect(result.valid).toBe(true)
   })
 
@@ -24,7 +26,7 @@ describe('MaterialService.validateFile', () => {
     const file = new File([largeContent], 'large.pdf', {
       type: 'application/pdf',
     })
-    const result = MaterialService.validateFile(file)
+    const result = validateFile(file)
     expect(result.valid).toBe(false)
     expect(result.error).toContain('exceeds the maximum limit')
   })
@@ -33,25 +35,25 @@ describe('MaterialService.validateFile', () => {
     const file = new File(['test'], 'test.docx', {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     })
-    const result = MaterialService.validateFile(file)
+    const result = validateFile(file)
     expect(result.valid).toBe(false)
     expect(result.error).toContain('not supported')
   })
 
   it('should reject files without extension', () => {
     const file = new File(['test'], 'test', { type: 'application/octet-stream' })
-    const result = MaterialService.validateFile(file)
+    const result = validateFile(file)
     expect(result.valid).toBe(false)
   })
 })
 
-describe('MaterialService file size validation', () => {
+describe('validateMaterialFile file size validation', () => {
   it('should accept file at maximum size limit', () => {
     const maxContent = new Array(50 * 1024 * 1024).fill('x').join('')
     const file = new File([maxContent], 'max.pdf', {
       type: 'application/pdf',
     })
-    const result = MaterialService.validateFile(file)
+    const result = validateFile(file)
     expect(result.valid).toBe(true)
   })
 
@@ -59,20 +61,20 @@ describe('MaterialService file size validation', () => {
     const file = new File(['small content'], 'small.txt', {
       type: 'text/plain',
     })
-    const result = MaterialService.validateFile(file)
+    const result = validateFile(file)
     expect(result.valid).toBe(true)
   })
 })
 
-describe('MaterialService file type validation', () => {
+describe('validateMaterialFile file type validation', () => {
   it('should handle case-insensitive extensions', () => {
     const file1 = new File(['test'], 'test.PDF', { type: 'application/pdf' })
     const file2 = new File(['test'], 'test.Txt', { type: 'text/plain' })
     const file3 = new File(['test'], 'test.MD', { type: 'text/markdown' })
 
-    expect(MaterialService.validateFile(file1).valid).toBe(true)
-    expect(MaterialService.validateFile(file2).valid).toBe(true)
-    expect(MaterialService.validateFile(file3).valid).toBe(true)
+    expect(validateFile(file1).valid).toBe(true)
+    expect(validateFile(file2).valid).toBe(true)
+    expect(validateFile(file3).valid).toBe(true)
   })
 
   it('should reject common invalid types', () => {
@@ -86,7 +88,7 @@ describe('MaterialService file type validation', () => {
 
     invalidTypes.forEach(({ name, type }) => {
       const file = new File(['test'], name, { type })
-      const result = MaterialService.validateFile(file)
+      const result = validateFile(file)
       expect(result.valid).toBe(false)
     })
   })
@@ -110,7 +112,7 @@ describe('MaterialService upload error handling', () => {
     
     // This would need actual Supabase mocks to fully test
     // For now, we verify the validation works
-    const validation = MaterialService.validateFile(file)
+    const validation = validateFile(file)
     expect(validation.valid).toBe(true)
   })
 })
