@@ -83,7 +83,7 @@ export class AIService {
     return this.callWithRetry(async () => {
       const client = this.getClient()
       const response = await client.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant', // Lighter model, less tokens
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
         max_tokens: 8000,
