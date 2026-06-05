@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { MaterialService } from '@/lib/services/MaterialService'
+import { validateMaterialFile } from '@/lib/materials/file-validation'
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import { useAuth } from '@/lib/auth/session'
 import { useMetadataSuggestions } from '@/lib/hooks/useMetadataSuggestions'
 import TagInput from './TagInput'
@@ -18,7 +19,7 @@ export default function MaterialUploader({
   onUploadError,
   maxFileSize = 50 * 1024 * 1024,
 }: MaterialUploaderProps) {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const { tagSuggestions, categorySuggestions } = useMetadataSuggestions(
     Boolean(user)
   )
@@ -48,7 +49,7 @@ export default function MaterialUploader({
 
     const droppedFile = e.dataTransfer.files[0]
     if (droppedFile) {
-      const validation = MaterialService.validateFile(droppedFile)
+      const validation = validateMaterialFile(droppedFile)
       if (!validation.valid) {
         setError(validation.error || 'Invalid file')
         return
@@ -64,7 +65,7 @@ export default function MaterialUploader({
     setError('')
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      const validation = MaterialService.validateFile(selectedFile)
+      const validation = validateMaterialFile(selectedFile) // ✅ уже импортирован
       if (!validation.valid) {
         setError(validation.error || 'Invalid file')
         return
@@ -75,36 +76,47 @@ export default function MaterialUploader({
       }
     }
   }
-
+  
   const handleUpload = async () => {
-    if (!file || !user) {
+    if (!file || !user || !session) {
       setError('Please select a file')
       return
     }
-
+  
     setError('')
     setIsUploading(true)
     setUploadProgress(0)
-
+  
     try {
-      const material = await MaterialService.uploadMaterial(
-        user.id,
-        file,
-        {
-          title: title || file.name.replace(/\.[^/.]+$/, ''),
-          category: category || undefined,
-          tags: tags.length > 0 ? tags : undefined,
-        },
-        (progress) => setUploadProgress(progress)
-      )
-
-      // Reset form
+      setUploadProgress(10)
+  
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('title', title || file.name.replace(/\.[^/.]+$/, ''))
+      if (category) formData.append('category', category)
+      if (tags.length > 0) formData.append('tags', tags.join(','))
+  
+      const response = await fetchWithAuth(session, '/api/materials', {
+        method: 'POST',
+        body: formData,
+      })
+  
+      setUploadProgress(75)
+  
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Upload failed')
+      }
+  
+      const { material } = await response.json()
+      setUploadProgress(100)
+  
       setFile(null)
       setTitle('')
       setCategory('')
       setTags([])
       setUploadProgress(0)
-
+  
       if (onUploadComplete) {
         onUploadComplete(material.id)
       }
@@ -117,11 +129,6 @@ export default function MaterialUploader({
     } finally {
       setIsUploading(false)
     }
-  }
-
-  const handleRetry = () => {
-    setError('')
-    handleUpload()
   }
 
   return (
