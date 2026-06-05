@@ -1,330 +1,150 @@
-import {
-  buildAnswerVerificationPrompt,
-  buildQuizGenerationPrompt,
-} from '@/lib/ai/quiz-prompt'
-import { AIServiceError } from '@/lib/ai/errors'
-import type {
-  AnswerVerification,
-  GeneratedQuiz,
-  GroqOptions,
-  Question,
-  QuizConfig,
-} from '@/lib/types'
-
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
-const DEFAULT_TIMEOUT_MS = 30_000
-const MAX_RETRIES = 3
-const RETRY_BASE_MS = 1_000
-
-type FetchFn = typeof fetch
-
-interface GroqChatResponse {
-  choices?: Array<{
-    message?: { content?: string }
-  }>
-  error?: { message?: string }
-}
+import Groq from 'groq-sdk'
+import type { Quiz, Question, QuizConfig, AnswerVerification } from '@/lib/types'
 
 export class AIService {
-  private static fetchFn: FetchFn | undefined
+  private static groq: Groq | null = null
+  private static readonly MAX_RETRIES = 3
+  private static readonly TIMEOUT = 30000
+  private static readonly RETRY_DELAYS = [1000, 2000, 4000]
 
-  static setFetchImplementation(fn: FetchFn): void {
-    this.fetchFn = fn
-  }
-
-  static resetFetchImplementation(): void {
-    this.fetchFn = undefined
-  }
-
-  private static resolveFetch(): FetchFn {
-    if (this.fetchFn) {
-      return this.fetchFn
-    }
-    if (typeof globalThis.fetch !== 'function') {
-      throw new AIServiceError('Fetch is not available', 'unavailable')
-    }
-    return globalThis.fetch.bind(globalThis)
-  }
-
-  static validateQuizConfig(config: QuizConfig): {
-    valid: boolean
-    error?: string
-  } {
-    if (config.questionCount < 5 || config.questionCount > 50) {
-      return {
-        valid: false,
-        error: 'Question count must be between 5 and 50',
+  private static getClient(): Groq {
+    if (!this.groq) {
+      const apiKey = process.env.GROQ_API_KEY
+      if (!apiKey) {
+        throw new Error('GROQ_API_KEY not configured')
       }
+      this.groq = new Groq({ apiKey })
     }
-    if (config.questionTypes.length === 0) {
-      return {
-        valid: false,
-        error: 'At least one question type is required',
+    return this.groq
+  }
+
+  private static async callWithRetry<T>(
+    fn: () => Promise<T>,
+    attempt = 0
+  ): Promise<T> {
+    try {
+      return await Promise.race([
+        fn(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), this.TIMEOUT)
+        ),
+      ])
+    } catch (error: any) {
+      if (attempt >= this.MAX_RETRIES - 1) throw error
+      
+      if (error?.status === 429) {
+        await new Promise((r) => setTimeout(r, this.RETRY_DELAYS[attempt]))
+        return this.callWithRetry(fn, attempt + 1)
       }
+      throw error
     }
-    return { valid: true }
   }
 
   static async generateQuiz(
     content: string,
-    config: QuizConfig,
-    materialTitle?: string
-  ): Promise<GeneratedQuiz> {
-    const validation = this.validateQuizConfig(config)
-    if (!validation.valid) {
-      throw new AIServiceError(validation.error!, 'unknown')
-    }
+    config: QuizConfig
+  ): Promise<Omit<Quiz, 'id' | 'userId' | 'materialId' | 'createdAt'>> {
+    const prompt = `Generate ${config.questionCount} quiz questions from this content.
 
-    if (!content.trim()) {
-      throw new AIServiceError(
-        'Material has no parsed content to generate a quiz from',
-        'unknown'
-      )
-    }
+Difficulty: ${config.difficulty}
+Question types: ${config.questionTypes.join(', ')}
 
-    const prompt = buildQuizGenerationPrompt(content, config, materialTitle)
-    const raw = await this.callGroqAPI<string>(prompt, {
-      model: DEFAULT_MODEL,
-      temperature: 0.4,
-      maxTokens: 8192,
-      timeout: DEFAULT_TIMEOUT_MS,
+Content:
+${content.substring(0, 4000)}
+
+Return ONLY a JSON object with this structure (no markdown, no extra text):
+{
+  "title": "Quiz title",
+  "questions": [
+    {
+      "questionText": "Question text",
+      "questionType": "multiple_choice" or "open_ended",
+      "difficulty": "easy" or "medium" or "hard",
+      "options": ["option1", "option2", "option3", "option4"] (only for multiple_choice),
+      "correctAnswer": "correct answer text",
+      "explanation": "why this is correct"
+    }
+  ]
+}`
+
+    return this.callWithRetry(async () => {
+      const client = this.getClient()
+      const response = await client.chat.completions.create({
+        model: 'mixtral-8x7b-32768',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 4000,
+      })
+
+      const text = response.choices[0]?.message?.content
+      if (!text) throw new Error('No response from AI')
+
+      const parsed = JSON.parse(text.replace(/```json\n?|\n?```/g, ''))
+      
+      return {
+        title: parsed.title,
+        difficulty: config.difficulty,
+        totalQuestions: parsed.questions.length,
+        status: 'draft' as const,
+        score: null,
+        questions: parsed.questions.map((q: any, i: number) => ({
+          questionText: q.questionText,
+          questionType: q.questionType,
+          difficulty: q.difficulty,
+          options: q.options || null,
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation,
+          orderIndex: i,
+        })),
+        completedAt: null,
+      }
     })
-
-    return this.parseQuizResponse(raw)
   }
 
   static async verifyAnswer(
-    question: Pick<
-      Question,
-      'questionText' | 'questionType' | 'correctAnswer'
-    >,
+    question: Question,
     userAnswer: string
   ): Promise<AnswerVerification> {
     if (question.questionType === 'multiple_choice') {
-      const isCorrect =
-        userAnswer.trim().toLowerCase() ===
-        question.correctAnswer.trim().toLowerCase()
-      if (isCorrect) {
-        return {
-          isCorrect: true,
-          feedback: 'Correct! Well done.',
-          correctAnswer: question.correctAnswer,
-        }
+      return {
+        isCorrect: userAnswer.trim() === question.correctAnswer.trim(),
+        feedback: question.explanation || 'Check the explanation',
+        correctAnswer: question.correctAnswer,
       }
     }
 
-    const prompt = buildAnswerVerificationPrompt(
-      question.questionText,
-      question.correctAnswer,
-      userAnswer,
-      question.questionType
-    )
+    const prompt = `Compare the user's answer to the correct answer using semantic similarity.
 
-    const raw = await this.callGroqAPI<string>(prompt, {
-      model: DEFAULT_MODEL,
-      temperature: 0.2,
-      maxTokens: 1024,
-      timeout: DEFAULT_TIMEOUT_MS,
-    })
+Question: ${question.questionText}
+Correct answer: ${question.correctAnswer}
+User answer: ${userAnswer}
 
-    return this.parseVerificationResponse(raw, question.correctAnswer)
-  }
+Return ONLY a JSON object (no markdown):
+{
+  "isCorrect": true or false,
+  "feedback": "detailed explanation",
+  "similarity": 0.0 to 1.0
+}`
 
-  private static async callGroqAPI<T>(
-    prompt: string,
-    options: GroqOptions
-  ): Promise<T> {
-    const apiKey = process.env.GROQ_API_KEY
-    if (!apiKey) {
-      throw new AIServiceError(
-        'GROQ_API_KEY is not configured',
-        'config'
-      )
-    }
-
-    let lastError: AIServiceError | null = null
-
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        const content = await this.requestGroq(prompt, options, apiKey)
-        return content as T
-      } catch (error) {
-        if (!(error instanceof AIServiceError)) {
-          throw error
-        }
-        lastError = error
-
-        const retryable =
-          error.code === 'rate_limit' ||
-          error.code === 'unavailable' ||
-          error.code === 'timeout'
-
-        if (!retryable || attempt === MAX_RETRIES - 1) {
-          throw error
-        }
-
-        const delay =
-          (error.retryAfterSeconds ?? 0) * 1000 ||
-          RETRY_BASE_MS * 2 ** attempt
-        await this.sleep(delay)
-      }
-    }
-
-    throw lastError ?? new AIServiceError('AI request failed', 'unknown')
-  }
-
-  private static async requestGroq(
-    prompt: string,
-    options: GroqOptions,
-    apiKey: string
-  ): Promise<string> {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), options.timeout)
-
-    try {
-      const response = await this.resolveFetch()(GROQ_API_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: options.model,
-          temperature: options.temperature,
-          max_tokens: options.maxTokens,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are a precise assistant that returns only valid JSON when asked.',
-            },
-            { role: 'user', content: prompt },
-          ],
-        }),
-        signal: controller.signal,
+    return this.callWithRetry(async () => {
+      const client = this.getClient()
+      const response = await client.chat.completions.create({
+        model: 'mixtral-8x7b-32768',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 500,
       })
 
-      if (response.status === 429) {
-        const retryAfter = parseInt(
-          response.headers.get('retry-after') ?? '0',
-          10
-        )
-        const body = (await response.json().catch(() => ({}))) as GroqChatResponse
-        const message = body.error?.message ?? 'Rate limit exceeded'
-        const code = message.toLowerCase().includes('quota')
-          ? 'quota'
-          : 'rate_limit'
-        throw new AIServiceError(message, code, retryAfter || 60)
+      const text = response.choices[0]?.message?.content
+      if (!text) throw new Error('No response from AI')
+
+      const parsed = JSON.parse(text.replace(/```json\n?|\n?```/g, ''))
+      
+      return {
+        isCorrect: parsed.isCorrect,
+        feedback: parsed.feedback,
+        correctAnswer: question.correctAnswer,
       }
-
-      if (response.status === 402 || response.status === 403) {
-        throw new AIServiceError(
-          'AI quota or permissions issue',
-          'quota'
-        )
-      }
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as GroqChatResponse
-        throw new AIServiceError(
-          body.error?.message ?? `AI request failed (${response.status})`,
-          response.status >= 500 ? 'unavailable' : 'unknown'
-        )
-      }
-
-      const body = (await response.json()) as GroqChatResponse
-      const content = body.choices?.[0]?.message?.content
-
-      if (!content) {
-        throw new AIServiceError('Empty AI response', 'parse')
-      }
-
-      return content
-    } catch (error) {
-      if (error instanceof AIServiceError) {
-        throw error
-      }
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new AIServiceError('AI request timed out', 'timeout')
-      }
-      throw new AIServiceError(
-        error instanceof Error ? error.message : 'AI request failed',
-        'unavailable'
-      )
-    } finally {
-      clearTimeout(timeoutId)
-    }
-  }
-
-  static parseQuizResponse(raw: string): GeneratedQuiz {
-    const parsed = this.extractJson(raw) as GeneratedQuiz
-
-    if (!parsed?.title || !Array.isArray(parsed.questions)) {
-      throw new AIServiceError('Invalid quiz structure in AI response', 'parse')
-    }
-
-    if (parsed.questions.length === 0) {
-      throw new AIServiceError('AI returned no questions', 'parse')
-    }
-
-    for (const q of parsed.questions) {
-      if (!q.questionText || !q.correctAnswer || !q.questionType) {
-        throw new AIServiceError('Invalid question in AI response', 'parse')
-      }
-      if (
-        q.questionType === 'multiple_choice' &&
-        (!q.options || q.options.length < 2)
-      ) {
-        throw new AIServiceError(
-          'Multiple choice question missing options',
-          'parse'
-        )
-      }
-    }
-
-    return parsed
-  }
-
-  static parseVerificationResponse(
-    raw: string,
-    fallbackCorrectAnswer: string
-  ): AnswerVerification {
-    const parsed = this.extractJson(raw) as AnswerVerification
-
-    if (typeof parsed?.isCorrect !== 'boolean' || !parsed.feedback) {
-      throw new AIServiceError(
-        'Invalid verification structure in AI response',
-        'parse'
-      )
-    }
-
-    return {
-      isCorrect: parsed.isCorrect,
-      feedback: parsed.feedback,
-      correctAnswer: parsed.correctAnswer ?? fallbackCorrectAnswer,
-    }
-  }
-
-  static extractJson(raw: string): unknown {
-    const trimmed = raw.trim()
-    const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-    const candidate = fenceMatch ? fenceMatch[1].trim() : trimmed
-
-    const start = candidate.indexOf('{')
-    const end = candidate.lastIndexOf('}')
-    if (start === -1 || end === -1) {
-      throw new AIServiceError('No JSON object in AI response', 'parse')
-    }
-
-    try {
-      return JSON.parse(candidate.slice(start, end + 1))
-    } catch {
-      throw new AIServiceError('Failed to parse AI JSON response', 'parse')
-    }
-  }
-
-  private static sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms))
+    })
   }
 }
