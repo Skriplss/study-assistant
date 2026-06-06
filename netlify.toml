@@ -10,17 +10,29 @@
   # Disable secrets scanning for NEXT_PUBLIC_* variables (they're meant to be public)
   SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_APP_URL"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
+# Function configuration - optimized for Next.js
 [functions]
-  # Node bundler for serverless functions
   node_bundler = "esbuild"
-  # Increase payload limit for file uploads
-  included_files = ["**/*"]
-
+  external_node_modules = ["@swc/core", "swc-loader", "esbuild"]
+  
 [functions."api/*"]
   # Max function duration for uploads and AI processing
   max_duration = 60
+
+# Image optimization
+[[redirects]]
+  from = "/_next/image*"
+  to = "/.netlify/images?url=:url&w=:width&q=:quality"
+  status = 200
+  query = {url = ":url", w = ":width", q = ":quality"}
+
+# Cache static assets
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

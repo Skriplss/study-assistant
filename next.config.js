@@ -3,6 +3,9 @@ const nextConfig = {
   // Performance optimizations
   compress: true, // Enable gzip compression
   
+  // Output configuration for Netlify
+  output: 'standalone',
+  
   // Image optimization
   images: {
     formats: ['image/avif', 'image/webp'],
@@ -15,12 +18,33 @@ const nextConfig = {
   // React optimizations
   reactStrictMode: true,
   
+  // Webpack optimizations to reduce bundle size
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Externalize large dependencies to reduce function size
+      config.externals = [
+        ...config.externals,
+        'canvas',
+        'jsdom',
+      ]
+    }
+    
+    // Tree shaking optimizations
+    config.optimization = {
+      ...config.optimization,
+      usedExports: true,
+      sideEffects: false,
+    }
+    
+    return config
+  },
+  
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',
     },
     // Optimize package imports
-    optimizePackageImports: ['reactflow', '@xyflow/react', 'recharts'],
+    optimizePackageImports: ['reactflow', '@xyflow/react', 'recharts', 'groq-sdk'],
   },
 
   // Headers for caching
