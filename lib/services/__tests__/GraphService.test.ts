@@ -7,7 +7,8 @@ jest.mock('server-only', () => ({}))
 jest.mock('../AIService', () => ({
   AIService: {
     callWithRetry: jest.fn(),
-    getClient: jest.fn(),
+    getGroqClient: jest.fn(),
+    getGeminiClient: jest.fn(),
     setFetchImplementation: jest.fn(),
     resetFetchImplementation: jest.fn(),
   },

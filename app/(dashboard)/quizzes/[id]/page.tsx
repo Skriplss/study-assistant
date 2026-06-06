@@ -54,10 +54,10 @@ export default function QuizPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading quiz...</p>
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground font-medium">Loading quiz...</p>
         </div>
       </div>
     )
@@ -65,12 +65,15 @@ export default function QuizPage() {
 
   if (error || !quiz) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error || 'Quiz not found'}</p>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center bg-card border border-border rounded-xl p-8 shadow-lg max-w-md">
+          <svg className="w-16 h-16 text-destructive mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-destructive mb-6 text-lg font-semibold">{error || 'Quiz not found'}</p>
           <button
             onClick={() => router.push('/dashboard')}
-            className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-semibold shadow-md hover:shadow-lg transition-all"
           >
             Back to Dashboard
           </button>
@@ -80,14 +83,27 @@ export default function QuizPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-background py-8">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">{quiz.title}</h1>
-          <div className="flex gap-4 text-sm text-gray-600">
-            <span>Difficulty: {quiz.difficulty}</span>
-            <span>•</span>
-            <span>{quiz.totalQuestions} questions</span>
+        <div className="mb-8 bg-card border border-border rounded-xl p-6 shadow-lg">
+          <h1 className="text-3xl font-bold mb-4 text-foreground">{quiz.title}</h1>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <span className={`px-3 py-1.5 rounded-full font-semibold ${
+              quiz.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
+              quiz.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
+              quiz.difficulty === 'hard' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' :
+              'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+            }`}>
+              {quiz.difficulty.charAt(0).toUpperCase() + quiz.difficulty.slice(1)}
+            </span>
+            <span className="px-3 py-1.5 rounded-full bg-secondary text-foreground font-semibold">
+              {quiz.totalQuestions} {quiz.totalQuestions === 1 ? 'question' : 'questions'}
+            </span>
+            {quiz.status === 'completed' && quiz.score !== null && (
+              <span className="px-3 py-1.5 rounded-full bg-primary text-primary-foreground font-semibold">
+                Score: {Math.round(quiz.score)}%
+              </span>
+            )}
           </div>
         </div>
 

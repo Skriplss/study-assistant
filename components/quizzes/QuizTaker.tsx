@@ -22,7 +22,7 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
   if (!currentQuestion) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">No questions found in this quiz.</p>
+        <p className="text-muted-foreground font-medium">No questions found in this quiz.</p>
       </div>
     )
   }

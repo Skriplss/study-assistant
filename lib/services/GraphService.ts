@@ -89,18 +89,31 @@ Text 2: ${text2}
 Return format: ["concept1", "concept2", ...]`
 
     try {
-      const response = await AIService['callWithRetry'](async () => {
-        const client = AIService['getClient']()
-        const res = await client.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3,
-          max_tokens: 500,
+      // Try Gemini first, fallback to Groq
+      let response: string | null | undefined
+      try {
+        console.log('Using Gemini')
+        response = await AIService['callWithRetry'](async () => {
+          const gemini = AIService['getGeminiClient']()
+          const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash' })
+          const result = await model.generateContent(prompt)
+          return result.response.text()
         })
-        return res.choices[0]?.message?.content || '[]'
-      })
+      } catch (error) {
+        console.log('Falling back to Groq')
+        response = await AIService['callWithRetry'](async () => {
+          const client = AIService['getGroqClient']()
+          const res = await client.chat.completions.create({
+            model: 'llama-3.1-8b-instant',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3,
+            max_tokens: 500,
+          })
+          return res.choices[0]?.message?.content || '[]'
+        })
+      }
 
-      const parsed = JSON.parse(response.replace(/```json\n?|\n?```/g, ''))
+      const parsed = JSON.parse((response || '[]').replace(/```json\n?|\n?```/g, ''))
       return Array.isArray(parsed) ? parsed.slice(0, 10) : []
     } catch {
       return []

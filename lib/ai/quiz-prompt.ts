@@ -4,7 +4,7 @@ const MAX_CONTENT_CHARS = 14_000
 
 export function truncateContent(content: string): string {
   if (content.length <= MAX_CONTENT_CHARS) return content
-  return `${content.slice(0, MAX_CONTENT_CHARS)}\n\n[Content truncated for quiz generation]`
+  return `${content.slice(0, MAX_CONTENT_CHARS)}\n\n[Content truncated]`
 }
 
 export function buildQuizGenerationPrompt(
@@ -12,73 +12,36 @@ export function buildQuizGenerationPrompt(
   config: QuizConfig,
   materialTitle?: string
 ): string {
-  const types =
-    config.questionTypes.length > 0
-      ? config.questionTypes.join(', ')
-      : 'multiple_choice, open_ended'
+  const types = config.questionTypes.length > 0 
+    ? config.questionTypes.join(', ') 
+    : 'multiple_choice, open_ended'
 
-  return `You are an expert educator creating a high-quality educational quiz. Generate clear, meaningful questions that test real understanding.
+  return `Create ${config.questionCount} educational quiz questions.
 
-Material title: ${materialTitle ?? 'Untitled'}
-Question count: ${config.questionCount}
-Overall difficulty preference: ${config.difficulty}
-Question types to include: ${types}
+Title: ${materialTitle ?? 'Untitled'}
+Difficulty: ${config.difficulty}
+Types: ${types}
 
-CRITICAL RULES:
-- Return ONLY valid JSON, no markdown fences or extra text.
-- Generate exactly ${config.questionCount} questions.
+AVOID: authors, dates, publishers, metadata, trivial facts
+FOCUS: concepts, processes, analysis, applications, key facts from content
 
-WHAT TO AVOID (DO NOT create questions about):
-- Authors, writers, or who wrote something
-- Publication dates, years, or when something was written
-- Publishers, editors, or sources
-- Book titles, chapter titles, or document metadata
-- Page numbers or document structure
-- Trivial or obvious information
-- Information not present in the material
+RULES:
+- Return valid JSON only (no markdown)
+- Multiple choice: exactly 4 unique options, correctAnswer matches one exactly
+- Open-ended: options=null, correctAnswer is 1-3 sentence model answer
+- Questions must be clear, test understanding, answerable from material
 
-WHAT TO FOCUS ON (Create questions about):
-- Key concepts and definitions
-- Main ideas and arguments
-- Processes, methods, and procedures
-- Cause and effect relationships
-- Applications and practical examples
-- Problem-solving and analysis
-- Comparisons and contrasts
-- Important facts and data from the content
-
-QUESTION QUALITY REQUIREMENTS:
-- Questions must be clear, specific, and unambiguous
-- Questions must test understanding, not just memorization
-- Questions must be answerable from the provided material
-- Each question must be unique and test different knowledge
-
-MULTIPLE CHOICE REQUIREMENTS:
-- Provide exactly 4 distinct options
-- ALL 4 options must be DIFFERENT from each other
-- Options should be plausible but only one correct
-- Avoid options like "All of the above" or "None of the above"
-- Make distractors (wrong answers) realistic but clearly incorrect
-- correctAnswer must match one option EXACTLY
-
-OPEN-ENDED REQUIREMENTS:
-- Set options to null
-- Provide a concise, clear model answer as correctAnswer
-- Model answer should be 1-3 sentences
-
-FORMAT:
+JSON format:
 {
   "title": "Quiz: ${materialTitle ?? 'Study Material'}",
-  "difficulty": "${config.difficulty}",
-  "totalQuestions": ${config.questionCount},
   "questions": [
     {
-      "questionText": "string (clear, specific question)",
-      "questionType": "multiple_choice" | "open_ended",
-      "difficulty": "easy" | "medium" | "hard",
-      "options": ["option1", "option2", "option3", "option4"] | null,
-      "correctAnswer": "string (must match one option exactly for MC)",
-      "explanation": "string (why this is the correct answer)",
+      "questionText": "string",
+      "questionType": "multiple_choice"|"open_ended",
+      "difficulty": "easy"|"medium"|"hard",
+      "options": ["a","b","c","d"]|null,
+      "correctAnswer": "string",
+      "explanation": "string",
       "orderIndex": 0
     }
   ]
@@ -94,20 +57,16 @@ export function buildAnswerVerificationPrompt(
   userAnswer: string,
   questionType: 'multiple_choice' | 'open_ended'
 ): string {
-  return `Evaluate the student's answer.
+  return `Evaluate answer.
 
-Question type: ${questionType}
-Question: ${questionText}
-Expected answer: ${correctAnswer}
-Student answer: ${userAnswer}
+Type: ${questionType}
+Q: ${questionText}
+Expected: ${correctAnswer}
+Student: ${userAnswer}
 
-Return ONLY valid JSON:
-{
-  "isCorrect": boolean,
-  "feedback": "string explaining the result",
-  "correctAnswer": "string (include for multiple_choice when incorrect)"
-}
+Return JSON only:
+{"isCorrect": bool, "feedback": "string"}
 
-For multiple_choice, isCorrect is true only if the student answer matches the expected option exactly (case-insensitive).
-For open_ended, use semantic similarity — accept paraphrases that capture the same meaning.`
+Multiple choice: exact match (case-insensitive)
+Open-ended: semantic match (accept paraphrases)`
 }
