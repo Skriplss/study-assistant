@@ -12,6 +12,7 @@ export interface StudyMaterial {
   parsingError: string | null
   category: string | null
   tags: string[]
+  language: string | null
   createdAt: string
   updatedAt: string
 }
@@ -24,6 +25,7 @@ export interface MaterialMetadata {
 
 export interface ParsedContent {
   text: string
+  language?: string
   metadata: {
     pageCount?: number
     wordCount: number

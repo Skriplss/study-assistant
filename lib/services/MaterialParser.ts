@@ -2,6 +2,7 @@ import pdfParse from 'pdf-parse'
 import MarkdownIt from 'markdown-it'
 import officeParser from 'officeparser'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { detectMaterialLanguage } from '@/lib/ai/language-detection'
 import type { ParsedContent } from '@/lib/types'
 
 export class MaterialParser {
@@ -323,37 +324,50 @@ export class MaterialParser {
     fileSize: number
   ): Promise<ParsedContent> {
     try {
+      let parsedContent: ParsedContent
+
       switch (fileType) {
         case 'pdf':
-          return await this.parseWithTimeout(
+          parsedContent = await this.parseWithTimeout(
             () => this.parsePDF(buffer),
             fileSize
           )
+          break
         case 'txt':
-          return await this.parseWithTimeout(
+          parsedContent = await this.parseWithTimeout(
             () => this.parseText(buffer),
             fileSize
           )
+          break
         case 'md':
-          return await this.parseWithTimeout(
+          parsedContent = await this.parseWithTimeout(
             () => this.parseMarkdown(buffer),
             fileSize
           )
+          break
         case 'pptx':
-          return await this.parseWithTimeout(
+          parsedContent = await this.parseWithTimeout(
             () => this.parsePPTX(buffer),
             fileSize
           )
+          break
         case 'png':
         case 'jpg':
         case 'jpeg':
-          return await this.parseWithTimeout(
+          parsedContent = await this.parseWithTimeout(
             () => this.parseImage(buffer, fileType),
             fileSize
           )
+          break
         default:
           throw new Error(`Unsupported file type: ${fileType}`)
       }
+
+      // Detect language from parsed text
+      const detectedLanguage = detectMaterialLanguage(parsedContent.text)
+      parsedContent.language = detectedLanguage
+
+      return parsedContent
     } catch (error) {
       if (error instanceof Error) {
         throw error

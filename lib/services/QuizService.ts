@@ -15,7 +15,7 @@ export class QuizService {
     
     const { data: material } = await db
       .from('study_materials')
-      .select('parsed_content, title')
+      .select('parsed_content, title, language')
       .eq('id', materialId)
       .single()
 
@@ -23,7 +23,12 @@ export class QuizService {
       throw new Error('Material not parsed yet')
     }
 
-    const quizData = await AIService.generateQuiz(material.parsed_content, config)
+    const quizData = await AIService.generateQuiz(
+      material.parsed_content, 
+      config, 
+      material.title,
+      material.language || undefined
+    )
     const quizId = crypto.randomUUID()
 
     const { error } = await db.from('quizzes').insert({

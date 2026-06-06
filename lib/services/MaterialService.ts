@@ -21,6 +21,7 @@ function mapMaterial(material: any, tags: string[]): StudyMaterial {
     parsingError: material.parsing_error,
     category: material.category,
     tags,
+    language: material.language,
     createdAt: material.created_at,
     updatedAt: material.updated_at,
   }

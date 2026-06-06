@@ -78,11 +78,12 @@ export async function POST(request: NextRequest) {
         throw new Error('Parsed content is empty or invalid')
       }
 
-      // Update database with parsed content
+      // Update database with parsed content and detected language
       const { error: updateError } = await db
         .from('study_materials')
         .update({
           parsed_content: parsedContent.text,
+          language: parsedContent.language || null,
           parsing_status: 'completed',
           parsing_error: null,
         } as any)

@@ -51,7 +51,7 @@ export class SearchService {
         userId: m.user_id,
         title: m.title,
         fileName: m.file_name,
-        fileType: m.file_type as 'pdf' | 'txt' | 'md',
+        fileType: m.file_type as 'pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg',
         fileSize: m.file_size,
         filePath: m.file_path,
         parsedContent: m.parsed_content,
@@ -59,6 +59,7 @@ export class SearchService {
         parsingError: m.parsing_error,
         category: m.category,
         tags: materialTags,
+        language: m.language,
         createdAt: m.created_at || new Date().toISOString(),
         updatedAt: m.updated_at || new Date().toISOString(),
       }

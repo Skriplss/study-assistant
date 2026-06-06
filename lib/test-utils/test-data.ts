@@ -17,6 +17,7 @@ export const generateMockMaterial = (
   parsingError: null,
   category: 'Computer Science',
   tags: ['javascript', 'testing'],
+  language: 'en',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   ...overrides,

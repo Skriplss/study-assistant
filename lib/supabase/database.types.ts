@@ -299,6 +299,7 @@ export type Database = {
           file_size: number
           file_type: string
           id: string
+          language: string | null
           parsed_content: string | null
           parsing_error: string | null
           parsing_status: string | null
@@ -314,6 +315,7 @@ export type Database = {
           file_size: number
           file_type: string
           id?: string
+          language?: string | null
           parsed_content?: string | null
           parsing_error?: string | null
           parsing_status?: string | null
@@ -329,6 +331,7 @@ export type Database = {
           file_size?: number
           file_type?: string
           id?: string
+          language?: string | null
           parsed_content?: string | null
           parsing_error?: string | null
           parsing_status?: string | null

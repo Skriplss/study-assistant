@@ -117,9 +117,10 @@ export class AIService {
   static async generateQuiz(
     content: string,
     config: QuizConfig,
-    materialTitle?: string
+    materialTitle?: string,
+    language?: string
   ): Promise<Omit<Quiz, 'id' | 'userId' | 'materialId' | 'createdAt'>> {
-    const prompt = buildQuizGenerationPrompt(content, config, materialTitle)
+    const prompt = buildQuizGenerationPrompt(content, config, materialTitle, language)
 
     // Try Gemini first, fallback to Groq on rate limits or errors
     let text: string | null | undefined

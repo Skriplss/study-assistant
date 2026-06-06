@@ -24,6 +24,7 @@
     "cytoscape": "^3.34.0",
     "dagre": "^0.8.5",
     "force-graph": "^1.51.4",
+    "franc": "^6.2.0",
     "groq-sdk": "^1.2.1",
     "katex": "^0.17.0",
     "markdown-it": "^14.1.0",
