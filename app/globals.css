@@ -2,59 +2,123 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   CSS CUSTOM PROPERTIES (Design Tokens)
+   ============================================ */
+
 @layer base {
+  /* Light Theme Colors */
   :root {
-    --background: 255 255 255;
-    --foreground: 15 23 42;
-    --card: 255 255 255;
-    --card-foreground: 15 23 42;
-    --primary: 59 130 246;
-    --primary-foreground: 255 255 255;
-    --secondary: 241 245 249;
-    --secondary-foreground: 15 23 42;
-    --muted: 241 245 249;
-    --muted-foreground: 100 116 139;
-    --accent: 241 245 249;
-    --accent-foreground: 15 23 42;
-    --destructive: 239 68 68;
-    --destructive-foreground: 255 255 255;
-    --border: 226 232 240;
-    --input: 226 232 240;
-    --ring: 59 130 246;
-    --radius: 0.5rem;
+    /* Backgrounds */
+    --background: 248 250 252;        /* Main page background - slate-50 */
+    --card: 255 255 255;              /* Card/panel background - white */
+    
+    /* Text Colors */
+    --foreground: 15 23 42;           /* Primary text - slate-900 */
+    --card-foreground: 15 23 42;      /* Text on cards - slate-900 */
+    --muted-foreground: 71 85 105;    /* Secondary text - slate-600 */
+    
+    /* Brand Colors */
+    --primary: 37 99 235;             /* Primary buttons/links - blue-600 */
+    --primary-foreground: 255 255 255; /* Text on primary - white */
+    
+    /* UI Elements */
+    --secondary: 226 232 240;         /* Secondary surfaces - slate-200 */
+    --secondary-foreground: 15 23 42; /* Text on secondary - slate-900 */
+    --muted: 241 245 249;             /* Muted surfaces - slate-100 */
+    --accent: 241 245 249;            /* Accent surfaces - slate-100 */
+    --accent-foreground: 15 23 42;    /* Text on accent - slate-900 */
+    
+    /* Borders & Inputs */
+    --border: 203 213 225;            /* Border color - slate-300 */
+    --input: 226 232 240;             /* Input borders - slate-200 */
+    --ring: 37 99 235;                /* Focus ring - blue-600 */
+    
+    /* Status Colors */
+    --destructive: 220 38 38;         /* Error/danger - red-600 */
+    --destructive-foreground: 255 255 255; /* Text on destructive - white */
+    
+    /* Border Radius */
+    --radius: 0.5rem;                 /* Default border radius - 8px */
   }
 
+  /* Dark Theme Colors */
   .dark {
-    --background: 15 23 42;
-    --foreground: 241 245 249;
-    --card: 30 41 59;
-    --card-foreground: 241 245 249;
-    --primary: 96 165 250;
-    --primary-foreground: 15 23 42;
-    --secondary: 51 65 85;
-    --secondary-foreground: 241 245 249;
-    --muted: 51 65 85;
-    --muted-foreground: 203 213 225;
-    --accent: 71 85 105;
-    --accent-foreground: 241 245 249;
-    --destructive: 239 68 68;
-    --destructive-foreground: 255 255 255;
-    --border: 71 85 105;
-    --input: 51 65 85;
-    --ring: 96 165 250;
+    /* Backgrounds */
+    --background: 15 23 42;           /* Main page background - slate-900 */
+    --card: 30 41 59;                 /* Card/panel background - slate-800 */
+    
+    /* Text Colors */
+    --foreground: 241 245 249;        /* Primary text - slate-100 */
+    --card-foreground: 241 245 249;   /* Text on cards - slate-100 */
+    --muted-foreground: 148 163 184;  /* Secondary text - slate-400 */
+    
+    /* Brand Colors */
+    --primary: 59 130 246;            /* Primary buttons/links - blue-500 */
+    --primary-foreground: 255 255 255; /* Text on primary - white */
+    
+    /* UI Elements */
+    --secondary: 51 65 85;            /* Secondary surfaces - slate-700 */
+    --secondary-foreground: 226 232 240; /* Text on secondary - slate-200 */
+    --muted: 51 65 85;                /* Muted surfaces - slate-700 */
+    --accent: 51 65 85;               /* Accent surfaces - slate-700 */
+    --accent-foreground: 226 232 240; /* Text on accent - slate-200 */
+    
+    /* Borders & Inputs */
+    --border: 71 85 105;              /* Border color - slate-600 */
+    --input: 51 65 85;                /* Input borders - slate-700 */
+    --ring: 59 130 246;               /* Focus ring - blue-500 */
+    
+    /* Status Colors */
+    --destructive: 220 38 38;         /* Error/danger - red-600 */
+    --destructive-foreground: 255 255 255; /* Text on destructive - white */
   }
 }
 
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
 @layer base {
+  /* Global Border Inheritance */
   * {
     @apply border-border;
   }
   
+  /* Body Styles */
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Select Dropdown Styling - Force proper colors */
+  select {
+    background-color: rgb(var(--card));
+    color: rgb(var(--card-foreground));
+  }
+  
+  select option {
+    background-color: rgb(var(--card));
+    color: rgb(var(--card-foreground));
+    padding: 0.5rem;
+    font-weight: 500;
+  }
+  
+  /* Dark mode select - explicit override */
+  .dark select {
+    background-color: rgb(30 41 59);
+    color: rgb(241 245 249);
+  }
+  
+  .dark select option {
+    background-color: rgb(30 41 59);
+    color: rgb(241 245 249);
+  }
 }
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
 
 @layer utilities {
   .text-balance {

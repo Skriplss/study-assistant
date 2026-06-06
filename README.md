@@ -12,9 +12,30 @@
 
 - **Frontend**: React 18, Next.js 14 (App Router), TypeScript, TailwindCSS
 - **Backend**: Supabase (PostgreSQL, Auth, Storage), Next.js API Routes
-- **AI**: Groq API (mixtral-8x7b-32768 or llama2-70b-4096)
+- **AI**: Google Gemini (gemini-2.0-flash) primary, Groq (llama-3.3-70b-versatile) fallback
 - **Visualization**: React Flow (knowledge graph), Recharts (analytics)
 - **File Processing**: pdf-parse, markdown-it
+
+## AI Provider Setup
+
+This application uses a dual-provider AI strategy for reliability:
+
+- **Primary**: Google Gemini API (`gemini-2.0-flash`) - Higher token limits, good for large quiz generation
+- **Fallback**: Groq API (`llama-3.3-70b-versatile`) - Activated on rate limits or errors
+
+### Features using AI:
+- **Quiz Generation**: Gemini primary → Groq fallback on quota/rate limits
+- **Answer Verification** (open-ended): Gemini primary → Groq fallback
+- **Knowledge Graph**: Gemini primary → Groq fallback for concept extraction
+
+### Rate Limit Handling:
+- Automatic retry with exponential backoff (1s, 2s, 4s)
+- Graceful fallback between providers
+- Detailed logging for debugging
+
+### Getting API Keys:
+- **Google AI API**: Get free tier key at https://ai.google.dev/
+- **Groq API**: Get free tier key at https://console.groq.com/
 
 ## Project Structure
 
