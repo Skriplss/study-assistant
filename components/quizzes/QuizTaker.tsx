@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
+import { LatexRenderer, hasLatex } from '@/components/ui/LatexRenderer'
 import type { Quiz, Answer } from '@/lib/types'
 
 interface QuizTakerProps {
@@ -106,7 +107,10 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
 
       <div className="bg-card rounded-xl shadow-lg border border-border p-8 mb-6">
         <div className="flex justify-between items-start mb-6">
-          <h2 className="text-2xl font-bold text-foreground pr-4">{currentQuestion.questionText}</h2>
+          <LatexRenderer 
+            content={currentQuestion.questionText} 
+            className="text-2xl font-bold text-foreground pr-4 flex-1"
+          />
           <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
             currentQuestion.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
             currentQuestion.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
@@ -136,7 +140,10 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
                   disabled={isAnswered}
                   className="mr-3 accent-primary"
                 />
-                <span className="text-foreground">{option}</span>
+                <LatexRenderer 
+                  content={option} 
+                  className="text-foreground inline"
+                />
               </label>
             ))}
           </div>
@@ -182,7 +189,10 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
               </span>
             </div>
             {currentAnswer.feedback && (
-              <p className="text-sm text-foreground/80 mt-3 leading-relaxed">{currentAnswer.feedback}</p>
+              <LatexRenderer 
+                content={currentAnswer.feedback} 
+                className="text-sm text-foreground/80 mt-3 leading-relaxed"
+              />
             )}
           </div>
         )}

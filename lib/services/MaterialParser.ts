@@ -1,11 +1,23 @@
 import pdfParse from 'pdf-parse'
 import MarkdownIt from 'markdown-it'
+import officeParser from 'officeparser'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { ParsedContent } from '@/lib/types'
 
 export class MaterialParser {
   private static readonly PARSING_TIMEOUT = 60000 // 60 seconds for large files
   private static readonly MAX_FILE_SIZE_FOR_TIMEOUT = 20 * 1024 * 1024 // 20MB
   private static markdown = new MarkdownIt()
+  private static gemini: GoogleGenerativeAI | null = null
+
+  private static getGeminiClient(): GoogleGenerativeAI {
+    if (!this.gemini) {
+      const apiKey = process.env.GOOGLE_AI_API_KEY
+      if (!apiKey) throw new Error('GOOGLE_AI_API_KEY not configured')
+      this.gemini = new GoogleGenerativeAI(apiKey)
+    }
+    return this.gemini
+  }
 
   /**
    * Clean extracted text from common PDF artifacts
@@ -190,6 +202,96 @@ export class MaterialParser {
   }
 
   /**
+   * Parse PPTX file using officeparser
+   */
+  static async parsePPTX(buffer: ArrayBuffer): Promise<ParsedContent> {
+    try {
+      const text = await officeParser.parseOffice(Buffer.from(buffer))
+      
+      if (!text || typeof text !== 'string') {
+        throw new Error('PPTX parsing extracted no text')
+      }
+
+      const cleanedText = this.cleanText(text)
+
+      if (!cleanedText || cleanedText.length < 50) {
+        throw new Error('PPTX parsing extracted insufficient text')
+      }
+
+      const lines = cleanedText.split('\n')
+      const paragraphs = cleanedText.split('\n\n').filter(p => p.length > 0)
+
+      return {
+        text: cleanedText,
+        metadata: {
+          wordCount: cleanedText.split(/\s+/).filter(Boolean).length,
+          structure: {
+            lineCount: lines.length,
+            paragraphCount: paragraphs.length,
+            fileType: 'pptx',
+          },
+        },
+      }
+    } catch (error) {
+      throw new Error(
+        `PPTX parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
+  }
+
+  /**
+   * Parse image file using Google Gemini Vision API
+   */
+  static async parseImage(buffer: ArrayBuffer, fileType: 'png' | 'jpg' | 'jpeg'): Promise<ParsedContent> {
+    try {
+      const gemini = this.getGeminiClient()
+      const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash' })
+
+      // Convert buffer to base64
+      const base64Image = Buffer.from(buffer).toString('base64')
+      const mimeType = fileType === 'png' ? 'image/png' : 'image/jpeg'
+
+      // Send image to Gemini Vision API
+      const prompt = 'Extract all text from this image. If it contains diagrams, formulas, or charts, describe them in detail.'
+      
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            data: base64Image,
+            mimeType,
+          },
+        },
+        prompt,
+      ])
+
+      const response = result.response
+      const extractedText = response.text()
+
+      if (!extractedText || extractedText.trim().length === 0) {
+        throw new Error('No text or content could be extracted from the image')
+      }
+
+      const cleanedText = this.cleanText(extractedText)
+
+      return {
+        text: cleanedText,
+        metadata: {
+          wordCount: cleanedText.split(/\s+/).filter(Boolean).length,
+          structure: {
+            fileType: 'image',
+            imageFormat: fileType,
+            extractionMethod: 'gemini-vision',
+          },
+        },
+      }
+    } catch (error) {
+      throw new Error(
+        `Image parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
+  }
+
+  /**
    * Parse file with timeout
    */
   static async parseWithTimeout(
@@ -217,7 +319,7 @@ export class MaterialParser {
    */
   static async parseMaterial(
     buffer: ArrayBuffer,
-    fileType: 'pdf' | 'txt' | 'md',
+    fileType: 'pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg',
     fileSize: number
   ): Promise<ParsedContent> {
     try {
@@ -235,6 +337,18 @@ export class MaterialParser {
         case 'md':
           return await this.parseWithTimeout(
             () => this.parseMarkdown(buffer),
+            fileSize
+          )
+        case 'pptx':
+          return await this.parseWithTimeout(
+            () => this.parsePPTX(buffer),
+            fileSize
+          )
+        case 'png':
+        case 'jpg':
+        case 'jpeg':
+          return await this.parseWithTimeout(
+            () => this.parseImage(buffer, fileType),
             fileSize
           )
         default:

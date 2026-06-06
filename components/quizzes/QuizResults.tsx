@@ -1,5 +1,6 @@
 'use client'
 
+import { LatexRenderer } from '@/components/ui/LatexRenderer'
 import type { QuizResults as Results } from '@/lib/types'
 
 interface QuizResultsProps {
@@ -70,7 +71,10 @@ export function QuizResults({ results, questions, onRetake, onBack }: QuizResult
                   {index + 1}
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-lg mb-3 text-card-foreground">{question.questionText}</h3>
+                  <LatexRenderer 
+                    content={question.questionText} 
+                    className="font-bold text-lg mb-3 text-card-foreground"
+                  />
                   <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${
                     question.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
                     question.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
@@ -89,7 +93,7 @@ export function QuizResults({ results, questions, onRetake, onBack }: QuizResult
                       ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100' 
                       : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100'
                   }`}>
-                    {answer.userAnswer}
+                    <LatexRenderer content={answer.userAnswer} />
                   </div>
                 </div>
 
@@ -97,7 +101,7 @@ export function QuizResults({ results, questions, onRetake, onBack }: QuizResult
                   <div>
                     <span className="text-sm font-bold text-muted-foreground uppercase tracking-wide">Correct answer:</span>
                     <div className="mt-2 p-4 bg-green-50 dark:bg-green-950 border-2 border-green-200 dark:border-green-800 rounded-lg font-medium text-green-900 dark:text-green-100">
-                      {question.correctAnswer}
+                      <LatexRenderer content={question.correctAnswer} />
                     </div>
                   </div>
                 )}
@@ -105,14 +109,20 @@ export function QuizResults({ results, questions, onRetake, onBack }: QuizResult
                 {answer.feedback && (
                   <div className="p-4 bg-blue-50 dark:bg-blue-950 border-2 border-blue-200 dark:border-blue-800 rounded-lg">
                     <span className="text-sm font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wide">Explanation:</span>
-                    <p className="text-sm text-blue-800 dark:text-blue-300 mt-2 leading-relaxed">{answer.feedback}</p>
+                    <LatexRenderer 
+                      content={answer.feedback} 
+                      className="text-sm text-blue-800 dark:text-blue-300 mt-2 leading-relaxed"
+                    />
                   </div>
                 )}
 
                 {question.explanation && !answer.feedback && (
                   <div className="p-4 bg-blue-50 dark:bg-blue-950 border-2 border-blue-200 dark:border-blue-800 rounded-lg">
                     <span className="text-sm font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wide">Explanation:</span>
-                    <p className="text-sm text-blue-800 dark:text-blue-300 mt-2 leading-relaxed">{question.explanation}</p>
+                    <LatexRenderer 
+                      content={question.explanation} 
+                      className="text-sm text-blue-800 dark:text-blue-300 mt-2 leading-relaxed"
+                    />
                   </div>
                 )}
               </div>

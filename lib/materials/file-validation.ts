@@ -1,5 +1,5 @@
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
-const ALLOWED_TYPES = ['pdf', 'txt', 'md']
+const ALLOWED_TYPES = ['pdf', 'txt', 'md', 'pptx', 'png', 'jpg', 'jpeg']
 
 export function validateMaterialFile(file: File): {
   valid: boolean

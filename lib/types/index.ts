@@ -4,7 +4,7 @@ export interface StudyMaterial {
   userId: string
   title: string
   fileName: string
-  fileType: 'pdf' | 'txt' | 'md'
+  fileType: 'pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg'
   fileSize: number
   filePath: string
   parsedContent: string | null
@@ -187,7 +187,7 @@ export interface TopicScore {
 
 // Search Types
 export interface SearchFilters {
-  fileTypes?: ('pdf' | 'txt' | 'md')[]
+  fileTypes?: ('pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg')[]
   tags?: string[]
   categories?: string[]
 }

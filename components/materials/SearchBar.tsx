@@ -37,10 +37,10 @@ export function SearchBar({ onResults }: SearchBarProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search materials..."
-          className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+          className="w-full px-4 py-3 pl-12 border border-black-300 rounded-lg focus:border-blue-500 focus:outline-none"
         />
         <svg
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black-400"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

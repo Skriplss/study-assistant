@@ -34,6 +34,10 @@ const FILE_TYPE_LABELS: Record<StudyMaterial['fileType'], string> = {
   pdf: 'PDF',
   txt: 'Text',
   md: 'Markdown',
+  pptx: 'PowerPoint',
+  png: 'Image',
+  jpg: 'Image',
+  jpeg: 'Image',
 }
 
 export default function MaterialCard({

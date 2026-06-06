@@ -187,14 +187,14 @@ export default function MaterialUploader({
                 <input
                   type="file"
                   className="hidden"
-                  accept=".pdf,.txt,.md"
+                  accept=".pdf,.txt,.md,.pptx,.png,.jpg,.jpeg"
                   onChange={handleFileSelect}
                   disabled={isUploading}
                 />
               </label>
             </p>
             <p className="text-sm text-gray-500">
-              Supported formats: PDF, TXT, MD (max {maxFileSize / 1024 / 1024}
+              Supported formats: PDF, TXT, MD, PPTX, PNG, JPG, JPEG (max {maxFileSize / 1024 / 1024}
               MB)
             </p>
           </>
