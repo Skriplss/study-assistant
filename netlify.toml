@@ -19,6 +19,14 @@
   # Max function duration for uploads and AI processing
   max_duration = 60
 
+[functions."api/materials"]
+  # Increase size limit for file uploads (100MB)
+  included_files = ["!node_modules/**/*"]
+
+[functions."api/materials/**"]
+  # Increase size limit for material operations
+  max_duration = 60
+
 # Image optimization
 [[redirects]]
   from = "/_next/image*"

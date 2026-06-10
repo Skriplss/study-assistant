@@ -3,7 +3,7 @@ const nextConfig = {
   // Performance optimizations
   compress: true, // Enable gzip compression
   
-  // Output configuration for Netlify
+  // Output configuration for Vercel
   output: 'standalone',
   
   // Image optimization
@@ -18,18 +18,14 @@ const nextConfig = {
   // React optimizations
   reactStrictMode: true,
   
-  // Webpack optimizations to reduce bundle size
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Externalize large dependencies to reduce function size
-      config.externals = [
-        ...config.externals,
-        'canvas',
-        'jsdom',
-      ]
-    }
-    
-    return config
+  // Turbopack configuration (Next.js 16+)
+  turbopack: {
+    rules: {
+      // Externalize large dependencies for server-side
+      '*.node': {
+        loaders: ['ignore-loader'],
+      },
+    },
   },
   
   experimental: {
