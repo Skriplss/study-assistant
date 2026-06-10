@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { QuizService } from '@/lib/services/QuizService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
-
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -30,9 +29,8 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ quiz }, { status: 201 })
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('Generate quiz error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to generate quiz'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

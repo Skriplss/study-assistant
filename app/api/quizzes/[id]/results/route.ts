@@ -1,33 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
-
-type RouteParams = { params: Promise<{ id: string }> }
+import { cookies } from 'next/headers'
 
 export async function GET(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get('session')?.value
+
+    if (!sessionCookie) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
+    const session = JSON.parse(sessionCookie)
     const db = getSupabaseAdmin()
+    const { id } = await params
 
     const { data: quiz } = await db
       .from('quizzes')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('user_id', session.userId)
       .single()
 
     if (!quiz) {
