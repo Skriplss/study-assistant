@@ -11,7 +11,7 @@ export default function DashboardLayout({
     <AuthGuard>
       <div className="min-h-screen bg-background flex flex-col">
         <DashboardNav />
-        <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex-1">{children}</main>
+        <main className="flex-1">{children}</main>
         <Footer />
       </div>
     </AuthGuard>

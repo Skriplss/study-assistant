@@ -1,5 +1,6 @@
-import MaterialsList from '@/components/materials/MaterialsList'
+import MaterialsListWithChat from '@/components/materials/MaterialsListWithChat'
 
 export default function MaterialsPage() {
-  return <MaterialsList />
+  return <MaterialsListWithChat />
 }
+
