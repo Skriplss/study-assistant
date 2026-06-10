@@ -24,10 +24,29 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Increase body size limit for this route
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: false,
+  },
+}
+
+export const maxDuration = 60 // Max duration in seconds for Netlify
+
 export async function POST(request: NextRequest) {
+  let formData: FormData | null = null
+  let file: File | null = null
+  
+  console.log('[Upload] Request received:', {
+    contentType: request.headers.get('content-type'),
+    contentLength: request.headers.get('content-length'),
+  })
+  
   try {
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
+      console.log('[Upload] Missing authorization header')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -35,28 +54,54 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
+      console.log('[Upload] Auth error:', authError)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const formData = await request.formData()
-    const file = formData.get('file') as File
+    console.log('[Upload] User authenticated:', user.id)
+
+    try {
+      console.log('[Upload] Parsing form data...')
+      formData = await request.formData()
+      console.log('[Upload] Form data parsed successfully')
+    } catch (parseError) {
+      console.error('[Upload] Failed to parse form data:', parseError)
+      return NextResponse.json({ 
+        error: 'Invalid request format. Please ensure you are uploading a file.',
+        details: parseError instanceof Error ? parseError.message : String(parseError)
+      }, { status: 400 })
+    }
+
+    file = formData.get('file') as File
     const title = formData.get('title') as string
     const category = formData.get('category') as string | null
     const tagsStr = formData.get('tags') as string | null
 
+    console.log('[Upload] File info:', {
+      name: file?.name,
+      size: file?.size,
+      type: file?.type,
+      title,
+      category,
+      tags: tagsStr,
+    })
+
     if (!file) {
+      console.log('[Upload] File is missing from form data')
       return NextResponse.json({ error: 'File is required' }, { status: 400 })
     }
 
     // Validate file size (max 75MB)
     const maxSize = 75 * 1024 * 1024
     if (file.size > maxSize) {
+      console.log('[Upload] File too large:', file.size)
       return NextResponse.json({ error: 'File size exceeds 75MB limit' }, { status: 400 })
     }
 
     // Validate file type
     const allowedTypes = ['application/pdf', 'text/plain', 'text/markdown']
     if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|txt|md)$/i)) {
+      console.log('[Upload] Invalid file type:', file.type)
       return NextResponse.json({ 
         error: 'Invalid file type. Only PDF, TXT, and MD files are allowed' 
       }, { status: 400 })
@@ -64,21 +109,35 @@ export async function POST(request: NextRequest) {
 
     const tags = tagsStr ? tagsStr.split(',').map((t) => t.trim()).filter(Boolean) : undefined
 
+    console.log('[Upload] Starting MaterialService.uploadMaterial...')
     const material = await MaterialService.uploadMaterial(user.id, file, {
       title: title || file.name.replace(/\.[^/.]+$/, ''),
       category: category || undefined,
       tags,
     })
+    console.log('[Upload] Material uploaded successfully:', material.id)
 
     return NextResponse.json({ material }, { status: 201 })
   } catch (error) {
-    console.error('Upload material error:', error)
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    console.error('[Upload] Upload material error:', error)
+    console.error('[Upload] Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+      fileName: file?.name,
+      fileSize: file?.size,
+    })
     
     const message = error instanceof Error ? error.message : 'Failed to upload material'
+    
+    // Always return JSON, never let it fall through to default error handler
     return NextResponse.json({ 
       error: message,
       details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : String(error)) : undefined
-    }, { status: 500 })
+    }, { 
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
   }
 }
