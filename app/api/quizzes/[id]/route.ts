@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { QuizService } from '@/lib/services/QuizService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 
-type RouteParams = { params: Promise<{ id: string }> }
-
 export async function GET(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -29,9 +27,8 @@ export async function GET(
     }
 
     return NextResponse.json({ quiz }, { status: 200 })
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('Get quiz error:', error)
-    const message = error instanceof Error ? error.message : 'Quiz not found'
-    return NextResponse.json({ error: message }, { status: 404 })
+    return NextResponse.json({ error: error.message }, { status: 404 })
   }
 }

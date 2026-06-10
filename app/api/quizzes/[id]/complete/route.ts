@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { QuizService } from '@/lib/services/QuizService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
-
-type RouteParams = { params: Promise<{ id: string }> }
-
 export async function POST(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -25,9 +22,8 @@ export async function POST(
     const results = await QuizService.completeQuiz(id)
 
     return NextResponse.json({ results }, { status: 200 })
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('Complete quiz error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to complete quiz'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

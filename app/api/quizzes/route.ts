@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { QuizService } from '@/lib/services/QuizService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
@@ -23,9 +24,8 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     return NextResponse.json({ quizzes: quizzes || [] }, { status: 200 })
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('List quizzes error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to list quizzes'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
