@@ -31,9 +31,7 @@ export default function DashboardNav() {
         </Link>
         <nav className="flex flex-wrap gap-1">
           {NAV_ITEMS.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== '/dashboard' && pathname.startsWith(item.href))
+            const active = pathname === item.href
             return (
               <Link
                 key={item.href}
