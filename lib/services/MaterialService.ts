@@ -40,8 +40,16 @@ export class MaterialService {
     metadata: MaterialMetadata,
     onProgress?: (progress: number) => void
   ): Promise<StudyMaterial> {
+    console.log('[MaterialService] Starting upload:', {
+      userId,
+      fileName: file.name,
+      fileSize: file.size,
+      metadata,
+    })
+
     const validation = this.validateFile(file)
     if (!validation.valid) {
+      console.log('[MaterialService] Validation failed:', validation.error)
       throw new Error(validation.error)
     }
  
@@ -50,29 +58,37 @@ export class MaterialService {
     const materialId = crypto.randomUUID()
     const filePath = `${userId}/${materialId}/original.${fileExtension}`
  
+    console.log('[MaterialService] Generated filePath:', filePath)
+
     try {
       if (onProgress) onProgress(10)
 
       // Check if bucket exists and is accessible
+      console.log('[MaterialService] Checking storage bucket...')
       const { data: buckets, error: bucketsError } = await db.storage.listBuckets()
       if (bucketsError) {
+        console.error('[MaterialService] Bucket list error:', bucketsError)
         throw new Error(`Storage not accessible: ${bucketsError.message}. Please check Supabase Storage configuration.`)
       }
       
       const bucketExists = buckets?.some(b => b.name === this.STORAGE_BUCKET)
+      console.log('[MaterialService] Bucket exists:', bucketExists, 'Available buckets:', buckets?.map(b => b.name))
+      
       if (!bucketExists) {
         throw new Error(`Storage bucket "${this.STORAGE_BUCKET}" does not exist. Please create it in Supabase Dashboard under Storage.`)
       }
  
+      console.log('[MaterialService] Uploading file to storage...')
       const { error: uploadError } = await db.storage
         .from(this.STORAGE_BUCKET)
         .upload(filePath, file, { cacheControl: '3600', upsert: false })
  
       if (uploadError) {
-        console.error('Storage upload error:', uploadError)
+        console.error('[MaterialService] Storage upload error:', uploadError)
         throw new Error(`Upload failed: ${uploadError.message}`)
       }
  
+      console.log('[MaterialService] File uploaded successfully')
       if (onProgress) onProgress(50)
  
       const materialData = {
@@ -87,6 +103,7 @@ export class MaterialService {
         parsing_status: 'pending' as const,
       }
  
+      console.log('[MaterialService] Inserting material to database:', materialData)
       const { error: dbError } = await db
         .from('study_materials')
         .insert(materialData)
@@ -94,30 +111,38 @@ export class MaterialService {
         .single()
  
       if (dbError) {
-        console.error('DB Error:', JSON.stringify(dbError, null, 2))
+        console.error('[MaterialService] DB Error:', JSON.stringify(dbError, null, 2))
+        console.log('[MaterialService] Cleaning up uploaded file...')
         await db.storage.from(this.STORAGE_BUCKET).remove([filePath])
         throw new Error(`Database error: ${dbError.message}`)
       }
  
+      console.log('[MaterialService] Material record created successfully')
       if (onProgress) onProgress(75)
  
       if (metadata.tags && metadata.tags.length > 0) {
+        console.log('[MaterialService] Adding tags:', metadata.tags)
         const tagData = metadata.tags.map((tag) => ({
           material_id: materialId,
           tag: tag.trim().toLowerCase(),
         }))
         await db.from('material_tags').insert(tagData)
+        console.log('[MaterialService] Tags added successfully')
       }
  
       if (onProgress) onProgress(100)
  
+      console.log('[MaterialService] Fetching created material...')
       return this.getMaterial(materialId)
     } catch (error) {
+      console.error('[MaterialService] Error in uploadMaterial:', error)
       // Clean up on error
       try {
+        console.log('[MaterialService] Attempting cleanup...')
         await db.storage.from(this.STORAGE_BUCKET).remove([filePath])
-      } catch {
-        // Ignore cleanup errors
+        console.log('[MaterialService] Cleanup successful')
+      } catch (cleanupError) {
+        console.error('[MaterialService] Cleanup failed:', cleanupError)
       }
       throw error
     }

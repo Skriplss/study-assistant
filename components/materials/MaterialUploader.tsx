@@ -55,11 +55,10 @@ export default function MaterialUploader({
         return
       }
       setFile(droppedFile)
-      if (!title) {
-        setTitle(droppedFile.name.replace(/\.[^/.]+$/, ''))
-      }
+      // Always update title from filename
+      setTitle(droppedFile.name.replace(/\.[^/.]+$/, ''))
     }
-  }, [title])
+  }, [])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('')
@@ -71,9 +70,8 @@ export default function MaterialUploader({
         return
       }
       setFile(selectedFile)
-      if (!title) {
-        setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''))
-      }
+      // Always update title from filename
+      setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''))
     }
   }
   
@@ -104,8 +102,17 @@ export default function MaterialUploader({
       setUploadProgress(75)
   
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Upload failed')
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json()
+          throw new Error(data.error || 'Upload failed')
+        } else {
+          // Server returned non-JSON (probably HTML error page)
+          const text = await response.text()
+          console.error('Server error:', text)
+          throw new Error('Server error. Please check console for details.')
+        }
       }
   
       const { material } = await response.json()
@@ -199,8 +206,8 @@ export default function MaterialUploader({
             </p>
           </>
         ) : (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center space-x-3 min-w-0 flex-1">
               <div className="flex-shrink-0">
                 <svg
                   className="h-10 w-10 text-blue-500"
@@ -214,8 +221,8 @@ export default function MaterialUploader({
                   />
                 </svg>
               </div>
-              <div className="text-left">
-                <p className="font-medium">{file.name}</p>
+              <div className="text-left min-w-0 flex-1">
+                <p className="font-medium truncate">{file.name}</p>
                 <p className="text-sm text-gray-500">
                   {(file.size / 1024).toFixed(2)} KB
                 </p>
@@ -224,7 +231,7 @@ export default function MaterialUploader({
             {!isUploading && (
               <button
                 onClick={() => setFile(null)}
-                className="text-red-600 hover:text-red-700"
+                className="text-red-600 hover:text-red-700 flex-shrink-0"
               >
                 Remove
               </button>
@@ -258,7 +265,7 @@ export default function MaterialUploader({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-background text-foreground"
               placeholder="Enter material title"
             />
           </div>
