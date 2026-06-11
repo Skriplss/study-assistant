@@ -179,38 +179,42 @@ export default function MaterialCard({
   }
 
   return (
-    <article className="border border-border rounded-xl p-6 bg-card shadow-lg hover:shadow-xl transition-all duration-300 space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-2 border-2 border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary font-semibold transition-all"
-            />
-          ) : (
-            <h3 className="font-bold text-xl text-foreground truncate">{currentMaterial.title}</h3>
-          )}
-          <p className="text-sm text-muted-foreground mt-2">
-            {FILE_TYPE_LABELS[currentMaterial.fileType]} · {formatFileSize(currentMaterial.fileSize)} ·{' '}
-            Uploaded {formatDate(currentMaterial.createdAt)}
-          </p>
-        </div>
-
-        {!isEditing && (
-          <span className="px-3 py-1.5 text-xs font-semibold bg-secondary text-secondary-foreground rounded-full">
+    <article className="border border-border rounded-lg p-4 bg-card hover:shadow-md transition-shadow">
+      {/* Header with title and file type */}
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <span className="inline-block px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded flex-shrink-0">
             {FILE_TYPE_LABELS[currentMaterial.fileType]}
           </span>
-        )}
+          
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-2 py-1 border border-border bg-background text-foreground rounded text-sm font-medium"
+              />
+            ) : (
+              <h3 className="font-semibold text-sm text-foreground truncate">{currentMaterial.title}</h3>
+            )}
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {formatFileSize(currentMaterial.fileSize)} · {formatDate(currentMaterial.createdAt)}
+            </p>
+          </div>
+        </div>
       </div>
 
-      <ParsingStatus material={currentMaterial} />
+      {/* Status badge */}
+      <div className="mb-2">
+        <ParsingStatus material={currentMaterial} />
+      </div>
 
+      {/* Category and Tags */}
       {isEditing ? (
-        <div className="space-y-4">
+        <div className="space-y-2 mb-3">
           <div>
-            <label className="block text-sm font-semibold mb-2 text-foreground">Category</label>
+            <label className="block text-xs font-medium mb-1 text-foreground">Category</label>
             <CategorySelector
               value={category}
               onChange={setCategory}
@@ -219,7 +223,7 @@ export default function MaterialCard({
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-2 text-foreground">Tags</label>
+            <label className="block text-xs font-medium mb-1 text-foreground">Tags</label>
             <TagInput
               tags={tags}
               onChange={setTags}
@@ -228,25 +232,24 @@ export default function MaterialCard({
             />
           </div>
           {saveError && (
-            <p className="text-sm text-destructive font-medium" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               {saveError}
             </p>
           )}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="mb-3 space-y-1">
           {material.category && (
-            <p className="text-sm">
-              <span className="font-semibold text-foreground">Category:</span>{' '}
-              <span className="text-muted-foreground">{material.category}</span>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium">Category:</span> {material.category}
             </p>
           )}
           {material.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1">
               {material.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium border border-primary/20"
+                  className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs"
                 >
                   {tag}
                 </span>
@@ -256,14 +259,15 @@ export default function MaterialCard({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 pt-4 border-t border-border">
+      {/* Actions */}
+      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border">
         {isEditing ? (
           <>
             <button
               type="button"
               onClick={handleSave}
               disabled={isSaving || !title.trim()}
-              className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground transition-all shadow-md"
+              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
             >
               {isSaving ? 'Saving…' : 'Save'}
             </button>
@@ -271,7 +275,7 @@ export default function MaterialCard({
               type="button"
               onClick={handleCancelEdit}
               disabled={isSaving}
-              className="px-4 py-2 text-sm font-medium border-2 border-border text-foreground rounded-lg hover:bg-accent transition-all"
+              className="px-3 py-1.5 text-xs font-medium border border-border text-foreground rounded hover:bg-accent"
             >
               Cancel
             </button>
@@ -281,7 +285,8 @@ export default function MaterialCard({
             <button
               type="button"
               onClick={() => setIsEditing(true)}
-              className="px-4 py-2 text-sm font-medium border-2 border-border text-foreground rounded-lg hover:bg-accent transition-all"
+              className="px-3 py-1.5 text-xs font-medium border border-border text-foreground rounded hover:bg-accent"
+              title="Edit"
             >
               Edit
             </button>
@@ -290,7 +295,8 @@ export default function MaterialCard({
                 type="button"
                 onClick={handleParse}
                 disabled={isParsing || currentMaterial.parsingStatus === 'processing'}
-                className="px-4 py-2 text-sm font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-muted disabled:text-muted-foreground transition-all shadow-md"
+                className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                title="Parse material"
               >
                 {isParsing || currentMaterial.parsingStatus === 'processing' ? 'Parsing…' : 'Parse'}
               </button>
@@ -299,15 +305,16 @@ export default function MaterialCard({
               type="button"
               onClick={() => onGenerateQuiz(currentMaterial.id)}
               disabled={currentMaterial.parsingStatus !== 'completed'}
-              className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-all shadow-md"
-              title={currentMaterial.parsingStatus !== 'completed' ? 'Parse the file first' : ''}
+              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={currentMaterial.parsingStatus !== 'completed' ? 'Parse the file first' : 'Generate quiz'}
             >
-              Generate quiz
+              Quiz
             </button>
             <button
               type="button"
               onClick={() => onDelete(currentMaterial.id)}
-              className="px-4 py-2 text-sm font-medium text-destructive border-2 border-destructive/30 rounded-lg hover:bg-destructive hover:text-destructive-foreground ml-auto transition-all"
+              className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded hover:bg-destructive hover:text-destructive-foreground ml-auto"
+              title="Delete"
             >
               Delete
             </button>

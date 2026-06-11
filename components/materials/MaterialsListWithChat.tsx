@@ -368,14 +368,9 @@ export default function MaterialsListWithChat() {
                       {groupName} ({groupMaterials.length})
                     </h2>
                   )}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {groupMaterials.map((material) => (
-                      <div
-                        key={material.id}
-                        className={`relative ${
-                          selectedMaterial?.id === material.id ? 'ring-2 ring-primary rounded-xl' : ''
-                        }`}
-                      >
+                      <div key={material.id} className="relative">
                         <MaterialCard
                           material={material}
                           onDelete={handleDelete}
@@ -389,9 +384,13 @@ export default function MaterialsListWithChat() {
                         {material.parsingStatus === 'completed' && (
                           <button
                             onClick={() => handleSelectMaterial(material)}
-                            className="absolute top-4 right-4 px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1"
+                            className={`absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded shadow-sm transition-colors ${
+                              selectedMaterial?.id === material.id
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
                           >
-                            Chat →
+                            Chat
                           </button>
                         )}
                       </div>
@@ -405,7 +404,7 @@ export default function MaterialsListWithChat() {
       </div>
 
       {/* Right Panel - Chat */}
-      <div className="w-[360px] border-l border-border bg-card flex flex-col flex-shrink-0">
+      <div className="w-[650px] border-l border-border bg-card flex flex-col flex-shrink-0">
         {!selectedMaterial ? (
           <div className="flex-1 flex items-center justify-center p-6 text-center">
             <p className="text-muted-foreground">
