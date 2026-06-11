@@ -207,16 +207,38 @@ export class MaterialParser {
    */
   static async parsePPTX(buffer: ArrayBuffer): Promise<ParsedContent> {
     try {
-      const text = await officeParser.parseOffice(Buffer.from(buffer))
+      console.log('[MaterialParser] Attempting to parse PPTX with officeparser...')
+      const text = await officeParser.parseOffice(Buffer.from(buffer), {
+        fileType: 'pptx'
+      })
       
-      if (!text || typeof text !== 'string') {
-        throw new Error('PPTX parsing extracted no text')
+      console.log('[MaterialParser] PPTX raw text length:', text?.length || 0)
+      
+      if (!text || typeof text !== 'string' || text.trim().length === 0) {
+        console.log('[MaterialParser] officeparser returned empty text, this PPTX may contain only images')
+        // Return empty but valid result - user can still use the file
+        return {
+          text: 'This presentation appears to contain primarily visual content. Text extraction was not possible with the current parser.',
+          metadata: {
+            wordCount: 0,
+            lineCount: 1,
+            paragraphCount: 1,
+          }
+        }
       }
 
       const cleanedText = this.cleanText(text)
 
-      if (!cleanedText || cleanedText.length < 50) {
-        throw new Error('PPTX parsing extracted insufficient text')
+      if (!cleanedText || cleanedText.length < 10) {
+        console.log('[MaterialParser] Cleaned text too short:', cleanedText?.length)
+        return {
+          text: 'This presentation contains minimal text content.',
+          metadata: {
+            wordCount: 0,
+            lineCount: 1,
+            paragraphCount: 1,
+          }
+        }
       }
 
       const lines = cleanedText.split('\n')
