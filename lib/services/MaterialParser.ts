@@ -100,7 +100,7 @@ export class MaterialParser {
       // Try UTF-8 first
       let text: string
       let encoding = 'utf-8'
-      
+
       try {
         const decoder = new TextDecoder('utf-8', { fatal: true })
         text = decoder.decode(buffer)
@@ -208,21 +208,26 @@ export class MaterialParser {
   static async parsePPTX(buffer: ArrayBuffer): Promise<ParsedContent> {
     try {
       console.log('[MaterialParser] Attempting to parse PPTX with officeparser...')
-      const text = await officeParser.parseOffice(Buffer.from(buffer), {
+
+      const result = await officeParser.parseOffice(Buffer.from(buffer), {
         fileType: 'pptx'
       })
-      
-      console.log('[MaterialParser] PPTX raw text length:', text?.length || 0)
-      
-      if (!text || typeof text !== 'string' || text.trim().length === 0) {
-        console.log('[MaterialParser] officeparser returned empty text, this PPTX may contain only images')
-        // Return empty but valid result - user can still use the file
+
+      // Convert result to string regardless of type
+      const text = typeof result === 'string' ? result : JSON.stringify(result)
+
+      console.log('[MaterialParser] PPTX raw text length:', text.length || 0)
+
+      if (!text || text.trim().length === 0) {
+        console.log('[MaterialParser] officeparser returned empty text')
         return {
           text: 'This presentation appears to contain primarily visual content. Text extraction was not possible with the current parser.',
           metadata: {
             wordCount: 0,
-            lineCount: 1,
-            paragraphCount: 1,
+            structure: {
+              lineCount: 1,
+              paragraphCount: 1,
+            }
           }
         }
       }
@@ -230,13 +235,14 @@ export class MaterialParser {
       const cleanedText = this.cleanText(text)
 
       if (!cleanedText || cleanedText.length < 10) {
-        console.log('[MaterialParser] Cleaned text too short:', cleanedText?.length)
         return {
           text: 'This presentation contains minimal text content.',
           metadata: {
             wordCount: 0,
-            lineCount: 1,
-            paragraphCount: 1,
+            structure: {
+              lineCount: 1,
+              paragraphCount: 1,
+            }
           }
         }
       }
@@ -276,7 +282,7 @@ export class MaterialParser {
 
       // Send image to Gemini Vision API
       const prompt = 'Extract all text from this image. If it contains diagrams, formulas, or charts, describe them in detail.'
-      
+
       const result = await model.generateContent([
         {
           inlineData: {
