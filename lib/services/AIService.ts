@@ -247,7 +247,7 @@ export class AIService {
           model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.3,
-          max_tokens: 500,
+          max_tokens: 700,
         })
         return response.choices[0]?.message?.content
       })
