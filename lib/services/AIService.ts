@@ -244,10 +244,10 @@ export class AIService {
       text = await this.callWithRetry(async () => {
         const client = this.getGroqClient()
         const response = await client.chat.completions.create({
-          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          model: 'llama-3.1-8b-instant',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.3,
-          max_tokens: 700,
+          max_tokens: 500,
         })
         return response.choices[0]?.message?.content
       })
