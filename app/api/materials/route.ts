@@ -24,15 +24,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Increase body size limit for this route
-export const config = {
-  api: {
-    bodyParser: false,
-    responseLimit: false,
-  },
-}
-
-export const maxDuration = 60 // Max duration in seconds for Netlify
+export const maxDuration = 60 // Max duration in seconds for Vercel
 
 export async function POST(request: NextRequest) {
   let formData: FormData | null = null
@@ -99,11 +91,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const allowedTypes = ['application/pdf', 'text/plain', 'text/markdown']
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|txt|md)$/i)) {
+    const allowedTypes = [
+      'application/pdf',
+      'text/plain',
+      'text/markdown',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-powerpoint',
+      'image/png',
+      'image/jpeg',
+      'image/jpg'
+    ]
+    const allowedExtensions = /\.(pdf|txt|md|pptx|ppt|png|jpg|jpeg)$/i
+    
+    if (!allowedTypes.includes(file.type) && !file.name.match(allowedExtensions)) {
       console.log('[Upload] Invalid file type:', file.type)
       return NextResponse.json({ 
-        error: 'Invalid file type. Only PDF, TXT, and MD files are allowed' 
+        error: 'Invalid file type. Only PDF, TXT, MD, PPTX, PNG, JPG, and JPEG files are allowed' 
       }, { status: 400 })
     }
 

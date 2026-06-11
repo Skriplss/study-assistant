@@ -86,14 +86,18 @@ export default function MaterialDetailPage() {
   }
 
   if (loading) {
-    return <p className="text-gray-500">Loading…</p>
+    return (
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <p className="text-muted-foreground">Loading…</p>
+      </div>
+    )
   }
 
   if (error && !material) {
     return (
-      <div className="space-y-4">
-        <p className="text-red-600">{error}</p>
-        <Link href="/materials" className="text-blue-600 hover:underline">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-4">
+        <p className="text-destructive">{error}</p>
+        <Link href="/materials" className="text-primary hover:underline inline-block">
           Back to materials
         </Link>
       </div>
@@ -103,8 +107,8 @@ export default function MaterialDetailPage() {
   if (!material) return null
 
   return (
-    <div className="space-y-6">
-      <Link href="/materials" className="text-sm text-blue-600 hover:underline">
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <Link href="/materials" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
         ← Back to materials
       </Link>
 
@@ -124,7 +128,7 @@ export default function MaterialDetailPage() {
             type="button"
             onClick={handleParse}
             disabled={isParsing}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
           >
             {isParsing ? 'Parsing…' : 'Parse file'}
           </button>
@@ -132,19 +136,34 @@ export default function MaterialDetailPage() {
       )}
 
       {material.parsingStatus === 'completed' && material.parsedContent && (
-        <section className="border border-gray-200 rounded-lg p-4 bg-white">
-          <h2 className="font-semibold mb-2">Extracted content preview</h2>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-12">
-            {material.parsedContent.slice(0, 2000)}
-            {material.parsedContent.length > 2000 ? '…' : ''}
-          </p>
+        <section className="border border-border rounded-lg p-6 bg-card">
+          <h2 className="font-semibold text-lg mb-4">Extracted content preview</h2>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <div className="text-sm text-foreground leading-relaxed space-y-2">
+              {material.parsedContent
+                .split('\n\n')
+                .slice(0, 5)
+                .map((paragraph, idx) => (
+                  <p key={idx} className="text-foreground line-clamp-3">
+                    {paragraph}
+                  </p>
+                ))}
+              {material.parsedContent.split('\n\n').length > 5 && (
+                <p className="text-muted-foreground italic">
+                  ... and {material.parsedContent.split('\n\n').length - 5} more paragraphs
+                </p>
+              )}
+            </div>
+          </div>
         </section>
       )}
 
       {error && (
-        <p className="text-sm text-red-600" role="alert">
-          {error}
-        </p>
+        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        </div>
       )}
     </div>
   )

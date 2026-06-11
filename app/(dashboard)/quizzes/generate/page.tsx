@@ -12,10 +12,10 @@ function QuizGenerateContent() {
 
   if (!materialId) {
     return (
-      <div className="space-y-4 max-w-lg">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-4">
         <h1 className="text-2xl font-bold">Quiz generation</h1>
-        <p className="text-gray-600">No material selected.</p>
-        <Link href="/materials" className="text-blue-600 hover:underline text-sm">
+        <p className="text-muted-foreground">No material selected.</p>
+        <Link href="/materials" className="text-primary hover:underline text-sm">
           ← Back to materials
         </Link>
       </div>
@@ -23,9 +23,9 @@ function QuizGenerateContent() {
   }
 
   return (
-    <div className="max-w-lg space-y-4">
+    <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 lg:px-8 py-8 space-y-4">
       <div className="flex items-center gap-4">
-        <Link href="/materials" className="text-blue-600 hover:underline text-sm">
+        <Link href="/materials" className="text-primary hover:underline text-sm">
           ← Back to materials
         </Link>
       </div>
@@ -39,7 +39,11 @@ function QuizGenerateContent() {
 
 export default function QuizGeneratePage() {
   return (
-    <Suspense fallback={<p className="text-gray-500">Loading…</p>}>
+    <Suspense fallback={
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <p className="text-muted-foreground">Loading…</p>
+      </div>
+    }>
       <QuizGenerateContent />
     </Suspense>
   )

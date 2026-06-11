@@ -34,30 +34,8 @@ const nextConfig = {
     },
     // Optimize package imports
     optimizePackageImports: ['reactflow', '@xyflow/react', 'recharts', 'groq-sdk'],
-  },
-
-  // Headers for caching
-  async headers() {
-    return [
-      {
-        source: '/:all*(svg|jpg|png|webp|avif)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-    ]
+    // Increase middleware body size limit
+    middlewareClientMaxBodySize: '100mb',
   },
 }
 
