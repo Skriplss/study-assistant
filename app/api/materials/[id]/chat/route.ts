@@ -129,7 +129,7 @@ Instructions:
         }))
         
         const response = await client.chat.completions.create({
-          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          model: 'qwen/qwen3.6-27b',
           messages: groqMessages,
           temperature: 0.5,
           max_tokens: 1000,
