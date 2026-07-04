@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import type { SearchResult } from '@/lib/types'
+import { useAuth } from '@/lib/auth/session'
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 
 interface SearchBarProps {
   onResults: (results: SearchResult[]) => void
@@ -10,14 +12,18 @@ interface SearchBarProps {
 export function SearchBar({ onResults }: SearchBarProps) {
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
+  const { session } = useAuth()
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!query.trim()) return
+    if (!query.trim() || !session) return
 
     setSearching(true)
     try {
-      const res = await fetch(`/api/materials/search?q=${encodeURIComponent(query)}`)
+      const res = await fetchWithAuth(
+        session,
+        `/api/materials/search?q=${encodeURIComponent(query)}`
+      )
       if (res.ok) {
         const results = await res.json()
         onResults(results)
@@ -37,10 +43,10 @@ export function SearchBar({ onResults }: SearchBarProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search materials..."
-          className="w-full px-4 py-3 pl-12 border border-black-300 rounded-lg focus:border-blue-500 focus:outline-none"
+          className="border-black-300 w-full rounded-lg border px-4 py-3 pl-12 focus:border-blue-500 focus:outline-none"
         />
         <svg
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black-400"
+          className="text-black-400 absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -54,7 +60,7 @@ export function SearchBar({ onResults }: SearchBarProps) {
         </svg>
         {searching && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2">
-            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
           </div>
         )}
       </div>

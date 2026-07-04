@@ -13,7 +13,7 @@ export async function POST(
 ) {
   try {
     const { id: materialId } = await params
-    
+
     // Get authorization token
     const authHeader = req.headers.get('authorization')
     if (!authHeader?.startsWith('Bearer ')) {
@@ -53,10 +53,7 @@ export async function POST(
       .single()
 
     if (materialError || !material) {
-      return NextResponse.json(
-        { error: 'Material not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Material not found' }, { status: 404 })
     }
 
     // Check if material has been parsed
@@ -82,15 +79,19 @@ Instructions:
 
     // Build conversation messages for AI
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = []
-    
+
     // Add system context as first user message (since Gemini doesn't have system role)
     messages.push({ role: 'user', content: systemPrompt })
-    messages.push({ role: 'assistant', content: 'I understand. I will answer questions based only on the provided material.' })
-    
+    messages.push({
+      role: 'assistant',
+      content:
+        'I understand. I will answer questions based only on the provided material.',
+    })
+
     // Add conversation history (keep last 10 messages)
     const recentHistory = (history as ChatMessage[]).slice(-10)
     messages.push(...recentHistory)
-    
+
     // Add current user message
     messages.push({ role: 'user', content: message })
 
@@ -102,24 +103,26 @@ Instructions:
       responseText = await AIService.callWithRetry(async () => {
         const gemini = AIService.getGeminiClient()
         const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash' })
-        
+
         // Convert messages to Gemini format
         const geminiMessages = messages.map((msg) => ({
           role: msg.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: msg.content }],
         }))
-        
+
         const chat = model.startChat({
           history: geminiMessages.slice(0, -1),
         })
-        
-        const result = await chat.sendMessage(messages[messages.length - 1].content)
+
+        const result = await chat.sendMessage(
+          messages[messages.length - 1].content
+        )
         const response = result.response
         return response.text()
       })
     } catch (geminiError: any) {
       console.log('Gemini error, falling back to Groq:', geminiError?.message)
-      
+
       // Fallback to Groq
       responseText = await AIService.callWithRetry(async () => {
         const client = AIService.getGroqClient()
@@ -127,15 +130,18 @@ Instructions:
           role: msg.role as 'user' | 'assistant',
           content: msg.content,
         }))
-        
+
         const response = await client.chat.completions.create({
-          model: 'meta-llama/llama-prompt-guard-2-86m',
+          model: 'llama-3.1-8b-instant',
           messages: groqMessages,
           temperature: 0.5,
           max_tokens: 1000,
         })
-        
-        return response.choices[0]?.message?.content || 'I could not generate a response.'
+
+        return (
+          response.choices[0]?.message?.content ||
+          'I could not generate a response.'
+        )
       })
     }
 
