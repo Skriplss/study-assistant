@@ -24,10 +24,10 @@ export class QuizService {
     }
 
     const quizData = await AIService.generateQuiz(
-      material.parsed_content, 
-      config, 
+      material.parsed_content,
+      config,
       material.title,
-      material.language || undefined
+      config.language || material.language || undefined
     )
     const quizId = crypto.randomUUID()
 
@@ -159,35 +159,36 @@ export class QuizService {
   static async completeQuiz(quizId: string): Promise<QuizResults> {
     const db = getSupabaseAdmin()
     
-    const { data: answers } = await db
-      .from('answers')
-      .select('*')
-      .eq('quiz_id', quizId)
-
-    const { data: quiz } = await db
-      .from('quizzes')
-      .select('total_questions, user_id, material_id')
-      .eq('id', quizId)
-      .single()
+    // Independent reads — run concurrently.
+    const [{ data: answers }, { data: quiz }] = await Promise.all([
+      db.from('answers').select('*').eq('quiz_id', quizId),
+      db
+        .from('quizzes')
+        .select('total_questions, user_id, material_id')
+        .eq('id', quizId)
+        .single(),
+    ])
 
     if (!quiz || !answers) throw new Error('Quiz not found')
 
     const correctCount = answers.filter((a) => a.is_correct).length
     const score = (correctCount / quiz.total_questions) * 100
 
-    await db
-      .from('quizzes')
-      .update({ status: 'completed', score, completed_at: new Date().toISOString() })
-      .eq('id', quizId)
-
-    await AnalyticsService.recordQuizCompletion(
-      quiz.user_id,
-      quizId,
-      score,
-      quiz.material_id,
-      quiz.total_questions,
-      correctCount
-    )
+    // Status update and analytics insert are independent — run concurrently.
+    await Promise.all([
+      db
+        .from('quizzes')
+        .update({ status: 'completed', score, completed_at: new Date().toISOString() })
+        .eq('id', quizId),
+      AnalyticsService.recordQuizCompletion(
+        quiz.user_id,
+        quizId,
+        score,
+        quiz.material_id,
+        quiz.total_questions,
+        correctCount
+      ),
+    ])
 
     return {
       quizId,
