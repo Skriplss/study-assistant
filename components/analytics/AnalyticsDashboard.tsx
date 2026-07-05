@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import {
@@ -38,6 +38,34 @@ export function AnalyticsDashboard() {
     }
   }
 
+  const scoreChartData = useMemo(
+    () =>
+      (data?.scoreHistory ?? []).map(s => ({
+        date: new Date(s.date).toLocaleDateString(),
+        score: Math.round(s.score),
+      })),
+    [data]
+  )
+
+  const tagChartData = useMemo(
+    () =>
+      (data?.performanceByTag ?? []).slice(0, 10).map(t => ({
+        name: t.tag,
+        score: Math.round(t.averageScore),
+        count: t.quizCount,
+      })),
+    [data]
+  )
+
+  const categoryChartData = useMemo(
+    () =>
+      (data?.performanceByCategory ?? []).map(c => ({
+        name: c.category,
+        value: Math.round(c.averageScore),
+      })),
+    [data]
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -53,22 +81,6 @@ export function AnalyticsDashboard() {
       </div>
     )
   }
-
-  const scoreChartData = data.scoreHistory.map(s => ({
-    date: new Date(s.date).toLocaleDateString(),
-    score: Math.round(s.score),
-  }))
-
-  const tagChartData = data.performanceByTag.slice(0, 10).map(t => ({
-    name: t.tag,
-    score: Math.round(t.averageScore),
-    count: t.quizCount,
-  }))
-
-  const categoryChartData = data.performanceByCategory.map(c => ({
-    name: c.category,
-    value: Math.round(c.averageScore),
-  }))
 
   return (
     <div className="space-y-6">
