@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import type { StudyMaterial } from '@/lib/types'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
@@ -40,7 +40,7 @@ const FILE_TYPE_LABELS: Record<StudyMaterial['fileType'], string> = {
   jpeg: 'Image',
 }
 
-export default function MaterialCard({
+function MaterialCard({
   material,
   onDelete,
   onEdit,
@@ -69,32 +69,18 @@ export default function MaterialCard({
     if (!session) return
     setIsParsing(true)
     try {
-      const response = await fetch('/api/materials/parse', {
+      const response = await fetchWithAuth(session, '/api/materials/parse', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ materialId: currentMaterial.id }),
       })
       if (response.ok) {
-        // Reload material from server to get fresh parsingStatus
-        const res = await fetch(`/api/materials/${currentMaterial.id}`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          console.log('Reloaded material:', data.material?.parsingStatus)
-          const updated = data.material ?? { ...currentMaterial, parsingStatus: 'completed' as const }
-          setCurrentMaterial(updated)
-          onEdit?.(updated)
-        } else {
-          const updated = { ...currentMaterial, parsingStatus: 'completed' as const }
-          setCurrentMaterial(updated)
-          onEdit?.(updated)
-        }
+        // Success implies parsing completed — no second round-trip needed.
+        const updated = { ...currentMaterial, parsingStatus: 'completed' as const }
+        setCurrentMaterial(updated)
+        onEdit?.(updated)
       } else {
-        const err = await response.json()
+        const err = await response.json().catch(() => ({}))
         console.error('Parse failed:', err)
       }
     } catch {
@@ -324,3 +310,5 @@ export default function MaterialCard({
     </article>
   )
 }
+
+export default memo(MaterialCard)
