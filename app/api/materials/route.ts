@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { MaterialService } from '@/lib/services/MaterialService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { isYouTubeUrl } from '@/lib/materials/youtube'
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +52,38 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[Upload] User authenticated:', user.id)
+
+    // Link-based materials (YouTube / web URL) arrive as JSON, not multipart.
+    const contentType = request.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      const body = await request.json()
+      const sourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : ''
+
+      if (!sourceUrl) {
+        return NextResponse.json({ error: 'sourceUrl is required' }, { status: 400 })
+      }
+      try {
+        new URL(sourceUrl)
+      } catch {
+        return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+      }
+
+      const fileType = isYouTubeUrl(sourceUrl) ? 'youtube' : 'url'
+      const rawTags = body.tags
+      const tags = Array.isArray(rawTags)
+        ? rawTags.map((t: unknown) => String(t).trim()).filter(Boolean)
+        : typeof rawTags === 'string'
+          ? rawTags.split(',').map((t) => t.trim()).filter(Boolean)
+          : undefined
+
+      const material = await MaterialService.createLinkMaterial(user.id, sourceUrl, fileType, {
+        title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : sourceUrl,
+        category: typeof body.category === 'string' && body.category ? body.category : undefined,
+        tags,
+      })
+
+      return NextResponse.json({ material }, { status: 201 })
+    }
 
     try {
       console.log('[Upload] Parsing form data...')

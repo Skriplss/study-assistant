@@ -57,10 +57,33 @@ export async function proxy(request: NextRequest) {
       },
     })
 
-    // Get session from cookies
-    const token = request.cookies.get('sb-access-token')?.value
+    const accessToken = request.cookies.get('sb-access-token')?.value
+    const refreshToken = request.cookies.get('sb-refresh-token')?.value
 
-    if (!token) {
+    // 1) A present access token is verified against Supabase.
+    let authed = false
+    let userId: string | undefined
+    if (accessToken) {
+      const { data } = await supabase.auth.getUser(accessToken)
+      if (data.user) {
+        authed = true
+        userId = data.user.id
+      }
+    }
+
+    // 2) Access cookie missing/expired but the long-lived refresh cookie is
+    //    present: let the request through. The short-lived (~1h) access cookie
+    //    lapses well before the refresh token, and the browser client re-syncs
+    //    it via /api/auth/sync-session. We deliberately do NOT refresh here —
+    //    rotating the refresh token from the edge races the browser's own
+    //    auto-refresh and can force a spurious logout. The real security
+    //    boundary is each API route (which re-verifies the Bearer token) plus
+    //    the client AuthGuard on UI routes.
+    if (!authed && refreshToken) {
+      authed = true
+    }
+
+    if (!authed) {
       // Redirect to login for UI routes
       if (!pathname.startsWith('/api')) {
         return NextResponse.redirect(new URL('/auth/login', request.url))
@@ -72,26 +95,8 @@ export async function proxy(request: NextRequest) {
       )
     }
 
-    // Verify token
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token)
-
-    if (error || !user) {
-      // Redirect to login for UI routes
-      if (!pathname.startsWith('/api')) {
-        return NextResponse.redirect(new URL('/auth/login', request.url))
-      }
-      // Return 401 for API routes
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Add user ID to headers for API routes
-    response.headers.set('x-user-id', user.id)
+    // Add user ID to headers for API routes (best-effort; only when verified).
+    if (userId) response.headers.set('x-user-id', userId)
     return response
   }
 

@@ -33,6 +33,7 @@ export class AIService {
   static readonly RETRY_DELAYS = [1000, 2000, 4000]
   static readonly MIN_QUESTIONS = 5
   static readonly MAX_QUESTIONS = 50
+  static readonly VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
   /** Injectable fetch for tests; defaults to global fetch. */
   private static fetchImpl: FetchImpl | null = null
@@ -85,8 +86,8 @@ export class AIService {
     )
   }
 
-  /** Single Groq HTTP attempt. Maps transport/HTTP errors to AIServiceError. */
-  private static async callGroqOnce(messages: ChatMessage[], opts: GroqOptions): Promise<string> {
+  /** Low-level Groq chat POST. Maps transport/HTTP errors to AIServiceError. */
+  private static async groqPost(body: object): Promise<string> {
     const apiKey = process.env.GROQ_API_KEY
     if (!apiKey) throw new AIServiceError('GROQ_API_KEY not configured', 'config')
 
@@ -102,13 +103,7 @@ export class AIService {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model: opts.model,
-          messages,
-          temperature: opts.temperature,
-          max_tokens: opts.maxTokens,
-          ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
-        }),
+        body: JSON.stringify(body),
       })
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') {
@@ -121,10 +116,21 @@ export class AIService {
 
     if (!res.ok) throw await this.toHttpError(res)
 
-    const body = await res.json()
-    const text = body?.choices?.[0]?.message?.content
+    const responseBody = await res.json()
+    const text = responseBody?.choices?.[0]?.message?.content
     if (!text) throw new AIServiceError('Empty response from Groq', 'parse')
     return text
+  }
+
+  /** Single Groq HTTP attempt for a text chat completion. */
+  private static async callGroqOnce(messages: ChatMessage[], opts: GroqOptions): Promise<string> {
+    return this.groqPost({
+      model: opts.model,
+      messages,
+      temperature: opts.temperature,
+      max_tokens: opts.maxTokens,
+      ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
+    })
   }
 
   /** Map a non-2xx Groq response to a coded AIServiceError. */
@@ -154,26 +160,57 @@ export class AIService {
     return Number.isFinite(seconds) ? seconds : undefined
   }
 
-  /** Groq call with retry on transient errors (5xx / rate limit). */
-  private static async callGroq(messages: ChatMessage[], opts: GroqOptions): Promise<string> {
-    for (let attempt = 0; ; attempt++) {
+  /** Retry a single Groq attempt on transient errors (5xx / rate limit). */
+  private static async withGroqRetry(attempt: () => Promise<string>): Promise<string> {
+    for (let i = 0; ; i++) {
       try {
-        return await this.callGroqOnce(messages, opts)
+        return await attempt()
       } catch (error) {
         const code = error instanceof AIServiceError ? error.code : 'unknown'
         const retryable = code === 'unavailable' || code === 'rate_limit'
-        if (!retryable || attempt >= this.MAX_RETRIES - 1) throw error
+        if (!retryable || i >= this.MAX_RETRIES - 1) throw error
 
         const retryAfter =
           error instanceof AIServiceError && error.retryAfterSeconds
             ? error.retryAfterSeconds * 1000
-            : this.RETRY_DELAYS[attempt]
+            : this.RETRY_DELAYS[i]
         console.log(
-          `Groq ${code}, retrying in ${retryAfter}ms (attempt ${attempt + 1}/${this.MAX_RETRIES})`
+          `Groq ${code}, retrying in ${retryAfter}ms (attempt ${i + 1}/${this.MAX_RETRIES})`
         )
         await new Promise((r) => setTimeout(r, retryAfter))
       }
     }
+  }
+
+  /** Groq call with retry on transient errors (5xx / rate limit). */
+  private static async callGroq(messages: ChatMessage[], opts: GroqOptions): Promise<string> {
+    return this.withGroqRetry(() => this.callGroqOnce(messages, opts))
+  }
+
+  /**
+   * OCR / describe an image via Groq vision (multimodal Llama 4 Scout).
+   * `base64Image` must be under Groq's ~4MB base64 limit. No Gemini.
+   */
+  static async extractImageText(base64Image: string, mimeType: string): Promise<string> {
+    const prompt =
+      'Extract all text from this image. If it contains diagrams, formulas, or charts, ' +
+      'describe them in detail. Respond only with the extracted content.'
+    return this.withGroqRetry(() =>
+      this.groqPost({
+        model: this.VISION_MODEL,
+        temperature: 0.2,
+        max_tokens: 4000,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+            ],
+          },
+        ],
+      })
+    )
   }
 
   // ---------------------------------------------------------------------------
@@ -206,6 +243,49 @@ export class AIService {
       throw new AIServiceError('AI response contained no questions', 'parse')
     }
     return parsed as GeneratedQuiz
+  }
+
+  /**
+   * Recover question objects from a response whose JSON is truncated (e.g. the
+   * model hit max_tokens mid-array). Scans balanced top-level objects inside the
+   * `questions` array, string-aware, and drops any trailing incomplete one.
+   */
+  static salvageQuestions(text: string): any[] {
+    const anchor = text.indexOf('"questions"')
+    const arrStart = text.indexOf('[', anchor === -1 ? 0 : anchor)
+    if (arrStart === -1) return []
+
+    const objects: any[] = []
+    let depth = 0
+    let objStart = -1
+    let inStr = false
+    let escaped = false
+
+    for (let i = arrStart; i < text.length; i++) {
+      const ch = text[i]
+      if (inStr) {
+        if (escaped) escaped = false
+        else if (ch === '\\') escaped = true
+        else if (ch === '"') inStr = false
+        continue
+      }
+      if (ch === '"') inStr = true
+      else if (ch === '{') {
+        if (depth === 0) objStart = i
+        depth++
+      } else if (ch === '}') {
+        depth--
+        if (depth === 0 && objStart !== -1) {
+          try {
+            objects.push(JSON.parse(text.slice(objStart, i + 1)))
+          } catch {
+            // skip malformed object
+          }
+          objStart = -1
+        }
+      }
+    }
+    return objects
   }
 
   static validateQuizConfig(config: QuizConfig): { valid: boolean; errors: string[] } {
@@ -254,28 +334,85 @@ export class AIService {
   // Public API
   // ---------------------------------------------------------------------------
 
+  /**
+   * One generation round: call the model, parse (with salvage fallback for
+   * truncated JSON), and keep only questions that pass quality checks.
+   */
+  private static async requestQuestions(
+    content: string,
+    config: QuizConfig,
+    materialTitle: string | undefined,
+    language: string | undefined,
+    count: number
+  ): Promise<{ title?: string; questions: any[] }> {
+    const prompt = buildQuizGenerationPrompt(content, { ...config, questionCount: count }, materialTitle, language)
+    // Scale the output budget to the question count (cap at Groq's limit).
+    const maxTokens = Math.min(8000, 1200 + count * 260)
+
+    const raw = await this.complete(prompt, {
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      temperature: 0.7,
+      maxTokens,
+    })
+
+    let title: string | undefined
+    let rawQuestions: any[]
+    try {
+      const parsed = this.parseQuizResponse(raw)
+      title = parsed.title
+      rawQuestions = parsed.questions
+    } catch (error) {
+      // JSON likely truncated at max_tokens — recover complete question objects.
+      rawQuestions = this.salvageQuestions(raw)
+      if (rawQuestions.length === 0) throw error
+      console.log(`Quiz JSON unparseable; salvaged ${rawQuestions.length} questions`)
+    }
+
+    return { title, questions: this.filterValidQuestions(rawQuestions) }
+  }
+
   static async generateQuiz(
     content: string,
     config: QuizConfig,
     materialTitle?: string,
     language?: string
   ): Promise<Omit<Quiz, 'id' | 'userId' | 'materialId' | 'createdAt'>> {
-    const prompt = buildQuizGenerationPrompt(content, config, materialTitle, language)
-    const raw = await this.complete(prompt, {
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      temperature: 0.7,
-      maxTokens: 8000,
-    })
+    const requested = config.questionCount
 
-    const parsed = this.parseQuizResponse(raw)
-    const questions = this.filterValidQuestions(parsed.questions)
-    if (questions.length === 0) throw new AIServiceError('No valid questions generated', 'parse')
-    if (questions.length < parsed.questions.length) {
-      console.log(`Kept ${questions.length}/${parsed.questions.length} generated questions`)
+    const first = await this.requestQuestions(content, config, materialTitle, language, requested)
+    let questions = first.questions
+
+    // Top up once if validation left us short of what the user asked for.
+    if (questions.length < requested) {
+      const missing = requested - questions.length
+      try {
+        const extra = await this.requestQuestions(
+          content,
+          config,
+          materialTitle,
+          language,
+          missing
+        )
+        const seen = new Set(questions.map((q) => q.questionText.trim().toLowerCase()))
+        for (const q of extra.questions) {
+          const key = q.questionText.trim().toLowerCase()
+          if (!seen.has(key)) {
+            seen.add(key)
+            questions.push(q)
+          }
+        }
+      } catch (error) {
+        console.log('Quiz top-up failed, using partial set:', (error as Error)?.message)
+      }
     }
 
+    if (questions.length === 0) throw new AIServiceError('No valid questions generated', 'parse')
+
+    // Never hand back more than requested.
+    questions = questions.slice(0, requested)
+
     return {
-      title: parsed.title || `Quiz: ${materialTitle || 'Study Material'}`,
+      title: first.title || `Quiz: ${materialTitle || 'Study Material'}`,
       difficulty: config.difficulty,
       totalQuestions: questions.length,
       status: 'draft' as const,

@@ -38,6 +38,8 @@ const FILE_TYPE_LABELS: Record<StudyMaterial['fileType'], string> = {
   png: 'Image',
   jpg: 'Image',
   jpeg: 'Image',
+  youtube: 'YouTube',
+  url: 'Web',
 }
 
 function MaterialCard({

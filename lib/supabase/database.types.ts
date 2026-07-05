@@ -295,7 +295,7 @@ export type Database = {
           category: string | null
           created_at: string | null
           file_name: string
-          file_path: string
+          file_path: string | null
           file_size: number
           file_type: string
           id: string
@@ -303,6 +303,7 @@ export type Database = {
           parsed_content: string | null
           parsing_error: string | null
           parsing_status: string | null
+          source_url: string | null
           title: string
           updated_at: string | null
           user_id: string
@@ -311,7 +312,7 @@ export type Database = {
           category?: string | null
           created_at?: string | null
           file_name: string
-          file_path: string
+          file_path?: string | null
           file_size: number
           file_type: string
           id?: string
@@ -319,6 +320,7 @@ export type Database = {
           parsed_content?: string | null
           parsing_error?: string | null
           parsing_status?: string | null
+          source_url?: string | null
           title: string
           updated_at?: string | null
           user_id: string
@@ -327,7 +329,7 @@ export type Database = {
           category?: string | null
           created_at?: string | null
           file_name?: string
-          file_path?: string
+          file_path?: string | null
           file_size?: number
           file_type?: string
           id?: string
@@ -335,6 +337,7 @@ export type Database = {
           parsed_content?: string | null
           parsing_error?: string | null
           parsing_status?: string | null
+          source_url?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string

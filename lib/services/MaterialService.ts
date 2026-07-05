@@ -4,7 +4,8 @@ import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { validateMaterialFile } from '@/lib/materials/file-validation'
 import type { StudyMaterial, MaterialMetadata } from '@/lib/types'
  
-type FileType = 'pdf' | 'txt' | 'md'
+type FileType = StudyMaterial['fileType']
+type LinkType = 'youtube' | 'url'
 type ParsingStatus = 'pending' | 'processing' | 'completed' | 'failed'
  
 function mapMaterial(material: any, tags: string[]): StudyMaterial {
@@ -15,7 +16,8 @@ function mapMaterial(material: any, tags: string[]): StudyMaterial {
     fileName: material.file_name,
     fileType: material.file_type as FileType,
     fileSize: material.file_size,
-    filePath: material.file_path,
+    filePath: material.file_path ?? null,
+    sourceUrl: material.source_url ?? null,
     parsedContent: material.parsed_content ?? null,
     parsingStatus: (material.parsing_status ?? 'pending') as ParsingStatus,
     parsingError: material.parsing_error,
@@ -148,6 +150,50 @@ export class MaterialService {
     }
   }
  
+  /** Create a link-based material (YouTube / web URL) — no file upload. */
+  static async createLinkMaterial(
+    userId: string,
+    sourceUrl: string,
+    fileType: LinkType,
+    metadata: MaterialMetadata
+  ): Promise<StudyMaterial> {
+    const db = getSupabaseAdmin()
+    const materialId = crypto.randomUUID()
+
+    const materialData = {
+      id: materialId,
+      user_id: userId,
+      title: metadata.title?.trim() || sourceUrl,
+      file_name: sourceUrl,
+      file_type: fileType,
+      file_size: 0,
+      file_path: null,
+      source_url: sourceUrl,
+      category: metadata.category || null,
+      parsing_status: 'pending' as const,
+    }
+
+    const { error: dbError } = await db
+      .from('study_materials')
+      .insert(materialData)
+      .select()
+      .single()
+
+    if (dbError) {
+      throw new Error(`Database error: ${dbError.message}`)
+    }
+
+    if (metadata.tags && metadata.tags.length > 0) {
+      const tagData = metadata.tags.map((tag) => ({
+        material_id: materialId,
+        tag: tag.trim().toLowerCase(),
+      }))
+      await db.from('material_tags').insert(tagData)
+    }
+
+    return this.getMaterial(materialId)
+  }
+
   static async getMaterial(materialId: string): Promise<StudyMaterial> {
     const db = getSupabaseAdmin()
     const { data: material, error } = await db
@@ -185,7 +231,7 @@ export class MaterialService {
     const { data: materials, error } = await db
       .from('study_materials')
       .select(
-        'id, user_id, title, file_name, file_type, file_size, file_path, parsing_status, parsing_error, category, language, created_at, updated_at'
+        'id, user_id, title, file_name, file_type, file_size, file_path, source_url, parsing_status, parsing_error, category, language, created_at, updated_at'
       )
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -253,12 +299,14 @@ export class MaterialService {
   static async deleteMaterial(materialId: string): Promise<void> {
     const db = getSupabaseAdmin()
     const material = await this.getMaterial(materialId)
- 
-    await db.storage.from(this.STORAGE_BUCKET).remove([material.filePath])
- 
-    const extractedPath = material.filePath.replace(/original\.\w+$/, 'extracted.txt')
-    await db.storage.from(this.STORAGE_BUCKET).remove([extractedPath])
- 
+
+    // Link materials (youtube/url) have no stored file to remove.
+    if (material.filePath) {
+      await db.storage.from(this.STORAGE_BUCKET).remove([material.filePath])
+      const extractedPath = material.filePath.replace(/original\.\w+$/, 'extracted.txt')
+      await db.storage.from(this.STORAGE_BUCKET).remove([extractedPath])
+    }
+
     const { error } = await db
       .from('study_materials')
       .delete()
@@ -272,7 +320,11 @@ export class MaterialService {
   static async downloadMaterial(materialId: string): Promise<Blob> {
     const db = getSupabaseAdmin()
     const material = await this.getMaterial(materialId)
- 
+
+    if (!material.filePath) {
+      throw new Error('Material has no stored file (link-based source)')
+    }
+
     const { data, error } = await db.storage
       .from(this.STORAGE_BUCKET)
       .download(material.filePath)

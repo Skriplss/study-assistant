@@ -4,9 +4,10 @@ export interface StudyMaterial {
   userId: string
   title: string
   fileName: string
-  fileType: 'pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg'
+  fileType: 'pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg' | 'youtube' | 'url'
   fileSize: number
-  filePath: string
+  filePath: string | null
+  sourceUrl: string | null
   parsedContent: string | null
   parsingStatus: 'pending' | 'processing' | 'completed' | 'failed'
   parsingError: string | null
@@ -74,7 +75,7 @@ export interface QuizConfig {
   questionCount: number // 5-50
   difficulty: 'easy' | 'medium' | 'hard' | 'mixed'
   questionTypes: ('multiple_choice' | 'open_ended')[]
-  language?: 'sk' | 'en' | 'ru' // user-chosen quiz language
+  language?: string // quiz language (BCP-47-ish code; falls back to material language)
 }
 
 export interface QuizResults {

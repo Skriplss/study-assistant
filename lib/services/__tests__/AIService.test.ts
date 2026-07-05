@@ -70,8 +70,10 @@ describe('AIService.parseQuizResponse', () => {
 })
 
 describe('AIService.generateQuiz', () => {
+  // questionCount 1 keeps the retry/error tests to a single generation round
+  // (no top-up), so their fetch-call assertions stay meaningful.
   const config: QuizConfig = {
-    questionCount: 5,
+    questionCount: 1,
     difficulty: 'medium',
     questionTypes: ['multiple_choice'],
   }
@@ -152,6 +154,55 @@ describe('AIService.generateQuiz', () => {
     await expect(
       AIService.generateQuiz('Content', config)
     ).rejects.toMatchObject({ code: 'config' })
+  })
+
+  it('tops up with a second round when the model returns too few questions', async () => {
+    const mcq = (label: string) => ({
+      questionText: `Question number ${label} about the topic?`,
+      questionType: 'multiple_choice',
+      difficulty: 'easy',
+      options: [`${label}-1`, `${label}-2`, `${label}-3`, `${label}-4`],
+      correctAnswer: `${label}-1`,
+      explanation: 'because',
+    })
+    const okJson = (obj: unknown) => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({ choices: [{ message: { content: JSON.stringify(obj) } }] }),
+    })
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(okJson({ title: 'Q', questions: [mcq('A'), mcq('B')] }))
+      .mockResolvedValueOnce(okJson({ questions: [mcq('C'), mcq('D')] }))
+    AIService.setFetchImplementation(fetchMock)
+
+    const quiz = await AIService.generateQuiz('content', { ...config, questionCount: 3 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(quiz.questions).toHaveLength(3)
+  })
+})
+
+describe('AIService.salvageQuestions', () => {
+  it('recovers complete objects from truncated JSON', () => {
+    const truncated =
+      '{"title":"T","questions":[' +
+      '{"questionText":"Q1","correctAnswer":"a"},' +
+      '{"questionText":"Q2","correctAnswer":"b"},' +
+      '{"questionText":"Q3","correctAns'
+    const objs = AIService.salvageQuestions(truncated)
+    expect(objs).toHaveLength(2)
+    expect(objs[0].questionText).toBe('Q1')
+    expect(objs[1].questionText).toBe('Q2')
+  })
+
+  it('ignores braces that appear inside string values', () => {
+    const text = '{"questions":[{"questionText":"What is {x}?","correctAnswer":"a"}]}'
+    const objs = AIService.salvageQuestions(text)
+    expect(objs).toHaveLength(1)
+    expect(objs[0].questionText).toBe('What is {x}?')
   })
 })
 

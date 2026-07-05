@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
       questionCount,
       difficulty: difficulty || 'mixed',
       questionTypes: questionTypes || ['multiple_choice', 'open_ended'],
-      language: ['sk', 'en', 'ru'].includes(language) ? language : 'en',
+      // Honor an explicitly requested language; otherwise let QuizService fall
+      // back to the material's own detected language.
+      language: typeof language === 'string' && language ? language : undefined,
     })
 
     return NextResponse.json({ quiz }, { status: 201 })

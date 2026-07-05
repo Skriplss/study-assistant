@@ -11,7 +11,7 @@ import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils/cn'
 
 type FilterStatus = 'all' | 'completed' | 'pending' | 'failed'
-type FilterFileType = 'all' | 'pdf' | 'txt' | 'pptx' | 'image'
+type FilterFileType = 'all' | 'pdf' | 'txt' | 'pptx' | 'image' | 'youtube' | 'url'
 type GroupBy = 'none' | 'category' | 'fileType' | 'date'
 
 export default function MaterialsListWithChat() {
@@ -242,7 +242,7 @@ export default function MaterialsListWithChat() {
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2">File Type</label>
           <div className="space-y-1">
-            {(['all', 'pdf', 'txt', 'pptx', 'image'] as FilterFileType[]).map((type) => (
+            {(['all', 'pdf', 'txt', 'pptx', 'image', 'youtube', 'url'] as FilterFileType[]).map((type) => (
               <button
                 key={type}
                 onClick={() => setFileTypeFilter(type)}

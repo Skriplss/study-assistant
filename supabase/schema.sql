@@ -15,9 +15,12 @@ CREATE TABLE IF NOT EXISTS study_materials (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title VARCHAR(500) NOT NULL,
   file_name VARCHAR(500) NOT NULL,
-  file_type VARCHAR(10) NOT NULL CHECK (file_type IN ('pdf', 'txt', 'md')),
+  file_type VARCHAR(20) NOT NULL CHECK (
+    file_type IN ('pdf', 'txt', 'md', 'pptx', 'png', 'jpg', 'jpeg', 'youtube', 'url')
+  ),
   file_size BIGINT NOT NULL,
-  file_path TEXT NOT NULL,
+  file_path TEXT,
+  source_url TEXT,
   parsed_content TEXT,
   parsing_status VARCHAR(20) DEFAULT 'pending' CHECK (
     parsing_status IN ('pending', 'processing', 'completed', 'failed')

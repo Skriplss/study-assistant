@@ -1,49 +1,44 @@
 import pdfParse from 'pdf-parse'
 import MarkdownIt from 'markdown-it'
 import officeParser from 'officeparser'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { Readability } from '@mozilla/readability'
+import { parseHTML } from 'linkedom'
+import { AIService } from '@/lib/services/AIService'
+import { fetchYouTubeTranscript } from '@/lib/materials/youtube'
 import { detectMaterialLanguage } from '@/lib/ai/language-detection'
 import type { ParsedContent } from '@/lib/types'
 
 export class MaterialParser {
   private static readonly PARSING_TIMEOUT = 60000 // 60 seconds for large files
   private static readonly MAX_FILE_SIZE_FOR_TIMEOUT = 20 * 1024 * 1024 // 20MB
+  // Groq vision rejects base64 images over ~4MB; cap raw bytes below that.
+  private static readonly MAX_IMAGE_BYTES = 3.75 * 1024 * 1024
   private static markdown = new MarkdownIt()
-  private static gemini: GoogleGenerativeAI | null = null
-
-  private static getGeminiClient(): GoogleGenerativeAI {
-    if (!this.gemini) {
-      const apiKey = process.env.GOOGLE_AI_API_KEY
-      if (!apiKey) throw new Error('GOOGLE_AI_API_KEY not configured')
-      this.gemini = new GoogleGenerativeAI(apiKey)
-    }
-    return this.gemini
-  }
 
   /**
    * Clean extracted text from common PDF artifacts
    */
   private static cleanText(text: string): string {
-    return text
-      // Remove excessive whitespace
-      .replace(/\s+/g, ' ')
-      // Remove page numbers (standalone numbers)
-      .replace(/^\s*\d+\s*$/gm, '')
-      // Remove common PDF artifacts
-      .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
-      // Fix hyphenation at line breaks
-      .replace(/(\w+)-\s+(\w+)/g, '$1$2')
-      // Normalize line breaks
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      // Remove multiple consecutive newlines
-      .replace(/\n{3,}/g, '\n\n')
-      // Trim each line
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .join('\n')
-      .trim()
+    return (
+      text
+        // Normalize line endings first
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        // Strip control chars, but keep \n (\x0A) and \t (\x09)
+        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
+        // Re-join words hyphenated across a line break
+        .replace(/(\w)-\n(\w)/g, '$1$2')
+        // Collapse runs of spaces/tabs — but NOT newlines (preserve paragraphs)
+        .replace(/[ \t]+/g, ' ')
+        // Trim each line; drop lines that are just a page number
+        .split('\n')
+        .map((line) => line.trim())
+        .map((line) => (/^\d+$/.test(line) ? '' : line))
+        .join('\n')
+        // Collapse 3+ newlines down to a single blank line (paragraph break)
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    )
   }
 
   /**
@@ -269,32 +264,20 @@ export class MaterialParser {
   }
 
   /**
-   * Parse image file using Google Gemini Vision API
+   * Parse image file using Groq vision (OCR + diagram/formula description).
    */
   static async parseImage(buffer: ArrayBuffer, fileType: 'png' | 'jpg' | 'jpeg'): Promise<ParsedContent> {
     try {
-      const gemini = this.getGeminiClient()
-      const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash' })
+      if (buffer.byteLength > this.MAX_IMAGE_BYTES) {
+        throw new Error(
+          `Image is too large (max ${Math.round(this.MAX_IMAGE_BYTES / 1024 / 1024)}MB for OCR)`
+        )
+      }
 
-      // Convert buffer to base64
       const base64Image = Buffer.from(buffer).toString('base64')
       const mimeType = fileType === 'png' ? 'image/png' : 'image/jpeg'
 
-      // Send image to Gemini Vision API
-      const prompt = 'Extract all text from this image. If it contains diagrams, formulas, or charts, describe them in detail.'
-
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            data: base64Image,
-            mimeType,
-          },
-        },
-        prompt,
-      ])
-
-      const response = result.response
-      const extractedText = response.text()
+      const extractedText = await AIService.extractImageText(base64Image, mimeType)
 
       if (!extractedText || extractedText.trim().length === 0) {
         throw new Error('No text or content could be extracted from the image')
@@ -309,13 +292,88 @@ export class MaterialParser {
           structure: {
             fileType: 'image',
             imageFormat: fileType,
-            extractionMethod: 'gemini-vision',
+            extractionMethod: 'groq-vision',
           },
         },
       }
     } catch (error) {
       throw new Error(
         `Image parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
+  }
+
+  /**
+   * Parse a YouTube video by fetching its transcript (captions). No AI.
+   */
+  static async parseYouTube(sourceUrl: string): Promise<ParsedContent> {
+    try {
+      const { text, videoId } = await fetchYouTubeTranscript(sourceUrl)
+      const cleanedText = this.cleanText(text)
+
+      if (!cleanedText || cleanedText.length < 50) {
+        throw new Error('Transcript was empty or too short')
+      }
+
+      return {
+        text: cleanedText,
+        metadata: {
+          wordCount: cleanedText.split(/\s+/).filter(Boolean).length,
+          structure: {
+            fileType: 'youtube',
+            videoId,
+            sourceUrl,
+          },
+        },
+      }
+    } catch (error) {
+      throw new Error(
+        `YouTube parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+          'The video may have captions disabled.'
+      )
+    }
+  }
+
+  /**
+   * Parse a web page by fetching it and extracting the readable article text. No AI.
+   */
+  static async parseURL(sourceUrl: string): Promise<ParsedContent> {
+    try {
+      const res = await fetch(sourceUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StudyAssistant/1.0)' },
+      })
+      if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`)
+
+      const html = await res.text()
+      const { document } = parseHTML(html)
+      const article = new Readability(document as any).parse()
+
+      const rawText = article?.textContent?.trim() || ''
+      const cleanedText = this.cleanText(rawText)
+
+      if (!cleanedText || cleanedText.length < 50) {
+        throw new Error('Could not extract meaningful text from the page')
+      }
+
+      const lines = cleanedText.split('\n')
+      const paragraphs = cleanedText.split('\n\n').filter((p) => p.length > 0)
+
+      return {
+        text: cleanedText,
+        metadata: {
+          wordCount: cleanedText.split(/\s+/).filter(Boolean).length,
+          structure: {
+            fileType: 'url',
+            sourceUrl,
+            pageTitle: article?.title || undefined,
+            lineCount: lines.length,
+            paragraphCount: paragraphs.length,
+          },
+        },
+      }
+    } catch (error) {
+      throw new Error(
+        `URL parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
     }
   }
@@ -402,6 +460,22 @@ export class MaterialParser {
       }
       throw new Error('Parsing failed with unknown error')
     }
+  }
+
+  /**
+   * Parse a link-based material (YouTube transcript or web page). No file download.
+   */
+  static async parseLink(
+    sourceUrl: string,
+    fileType: 'youtube' | 'url'
+  ): Promise<ParsedContent> {
+    const parsedContent =
+      fileType === 'youtube'
+        ? await this.parseYouTube(sourceUrl)
+        : await this.parseURL(sourceUrl)
+
+    parsedContent.language = detectMaterialLanguage(parsedContent.text)
+    return parsedContent
   }
 
   /**

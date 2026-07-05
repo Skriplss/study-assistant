@@ -24,6 +24,8 @@ export default function MaterialUploader({
   const { tagSuggestions, categorySuggestions } = useMetadataSuggestions(
     Boolean(user)
   )
+  const [mode, setMode] = useState<'file' | 'link'>('file')
+  const [sourceUrl, setSourceUrl] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
@@ -153,6 +155,75 @@ export default function MaterialUploader({
     }
   }
 
+  const handleLinkSubmit = async () => {
+    if (!user || !session) return
+
+    const url = sourceUrl.trim()
+    if (!url) {
+      setError('Please paste a URL')
+      return
+    }
+    try {
+      new URL(url)
+    } catch {
+      setError('That does not look like a valid URL')
+      return
+    }
+
+    setError('')
+    setIsUploading(true)
+    setUploadProgress(20)
+
+    try {
+      const response = await fetchWithAuth(session, '/api/materials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceUrl: url,
+          title: title.trim() || undefined,
+          category: category || undefined,
+          tags: tags.length > 0 ? tags : undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to add link')
+      }
+
+      const { material } = await response.json()
+      setUploadProgress(75)
+
+      // Fetch transcript / page content
+      try {
+        await fetch('/api/materials/parse', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ materialId: material.id }),
+        })
+      } catch {
+        // Parse can be retried manually later
+      }
+
+      setSourceUrl('')
+      setTitle('')
+      setCategory('')
+      setTags([])
+      setUploadProgress(0)
+
+      if (onUploadComplete) onUploadComplete(material.id)
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to add link')
+      setError(error.message)
+      if (onUploadError) onUploadError(error)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   const handleRetry = () => {
   setError('')
   handleUpload()
@@ -160,7 +231,31 @@ export default function MaterialUploader({
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
+      {/* Source mode toggle */}
+      {!isUploading && (
+        <div className="flex gap-2 rounded-lg bg-secondary p-1">
+          {(['file', 'link'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                setMode(m)
+                setError('')
+              }}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                mode === m
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {m === 'file' ? 'Upload file' : 'From link'}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Drag and Drop Area */}
+      {mode === 'file' && (
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -240,6 +335,26 @@ export default function MaterialUploader({
           </div>
         )}
       </div>
+      )}
+
+      {/* Link input */}
+      {mode === 'link' && !isUploading && (
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            YouTube or web page URL
+          </label>
+          <input
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground placeholder:text-muted-foreground"
+            placeholder="https://www.youtube.com/watch?v=... or https://example.com/article"
+          />
+          <p className="mt-1 text-sm text-muted-foreground">
+            We&apos;ll pull the transcript (YouTube) or article text (web page).
+          </p>
+        </div>
+      )}
 
       {/* Upload Progress */}
       {isUploading && (
@@ -258,7 +373,8 @@ export default function MaterialUploader({
       )}
 
       {/* Metadata Form */}
-      {file && !isUploading && (
+      {((mode === 'file' && file) || (mode === 'link' && sourceUrl.trim())) &&
+        !isUploading && (
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Title</label>
@@ -311,9 +427,19 @@ export default function MaterialUploader({
       )}
 
       {/* Upload Button */}
-      {file && !isUploading && (
+      {mode === 'file' && file && !isUploading && (
         <Button onClick={handleUpload} disabled={!title.trim()} size="lg" className="w-full">
           Upload Material
+        </Button>
+      )}
+      {mode === 'link' && !isUploading && (
+        <Button
+          onClick={handleLinkSubmit}
+          disabled={!sourceUrl.trim()}
+          size="lg"
+          className="w-full"
+        >
+          Add Link
         </Button>
       )}
     </div>

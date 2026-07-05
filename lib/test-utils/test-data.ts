@@ -12,6 +12,7 @@ export const generateMockMaterial = (
   fileType: 'pdf',
   fileSize: 1024000,
   filePath: 'test-user-id/material-1/original.pdf',
+  sourceUrl: null,
   parsedContent: 'This is test content for the study material.',
   parsingStatus: 'completed',
   parsingError: null,

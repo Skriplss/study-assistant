@@ -62,16 +62,30 @@ export async function POST(request: NextRequest) {
       .eq('id', materialId)
 
     try {
-      // Download file from storage
-      const fileBlob = await MaterialService.downloadMaterial(materialId)
-      const buffer = await fileBlob.arrayBuffer()
+      const isLink = material.fileType === 'youtube' || material.fileType === 'url'
 
-      // Parse the file
-      const parsedContent = await MaterialParser.parseMaterial(
-        buffer,
-        material.fileType,
-        material.fileSize
-      )
+      let parsedContent
+      if (isLink) {
+        // Link materials (youtube/url) have no stored file — parse from source URL.
+        if (!material.sourceUrl) {
+          throw new Error('Material is missing its source URL')
+        }
+        parsedContent = await MaterialParser.parseLink(
+          material.sourceUrl,
+          material.fileType as 'youtube' | 'url'
+        )
+      } else {
+        // Download file from storage
+        const fileBlob = await MaterialService.downloadMaterial(materialId)
+        const buffer = await fileBlob.arrayBuffer()
+
+        // Parse the file
+        parsedContent = await MaterialParser.parseMaterial(
+          buffer,
+          material.fileType as 'pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg',
+          material.fileSize
+        )
+      }
 
       // Validate parsed content
       if (!MaterialParser.validateParsedContent(parsedContent)) {
@@ -93,17 +107,19 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to save parsed content: ${updateError.message}`)
       }
 
-      // Store extracted text in storage (optional backup)
-      const extractedPath = material.filePath.replace(
-        /original\.\w+$/,
-        'extracted.txt'
-      )
-      await db.storage
-        .from('study-materials')
-        .upload(extractedPath, parsedContent.text, {
-          contentType: 'text/plain',
-          upsert: true,
-        })
+      // Store extracted text in storage (optional backup) — file materials only.
+      if (material.filePath) {
+        const extractedPath = material.filePath.replace(
+          /original\.\w+$/,
+          'extracted.txt'
+        )
+        await db.storage
+          .from('study-materials')
+          .upload(extractedPath, parsedContent.text, {
+            contentType: 'text/plain',
+            upsert: true,
+          })
+      }
 
       return NextResponse.json(
         {
