@@ -16,7 +16,7 @@ function mapMaterial(material: any, tags: string[]): StudyMaterial {
     fileType: material.file_type as FileType,
     fileSize: material.file_size,
     filePath: material.file_path,
-    parsedContent: material.parsed_content,
+    parsedContent: material.parsed_content ?? null,
     parsingStatus: (material.parsing_status ?? 'pending') as ParsingStatus,
     parsingError: material.parsing_error,
     category: material.category,
@@ -168,11 +168,25 @@ export class MaterialService {
     return mapMaterial(material, tags?.map((t) => t.tag) || [])
   }
  
+  /** Cheap ownership lookup — avoids fetching the full material just to authz. */
+  static async getMaterialOwner(materialId: string): Promise<string | null> {
+    const db = getSupabaseAdmin()
+    const { data } = await db
+      .from('study_materials')
+      .select('user_id')
+      .eq('id', materialId)
+      .single()
+    return data?.user_id ?? null
+  }
+
   static async listMaterials(userId: string): Promise<StudyMaterial[]> {
     const db = getSupabaseAdmin()
+    // List view never renders parsed_content (can be megabytes) — omit it.
     const { data: materials, error } = await db
       .from('study_materials')
-      .select('*')
+      .select(
+        'id, user_id, title, file_name, file_type, file_size, file_path, parsing_status, parsing_error, category, language, created_at, updated_at'
+      )
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
  
