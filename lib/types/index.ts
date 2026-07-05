@@ -74,6 +74,7 @@ export interface QuizConfig {
   questionCount: number // 5-50
   difficulty: 'easy' | 'medium' | 'hard' | 'mixed'
   questionTypes: ('multiple_choice' | 'open_ended')[]
+  language?: 'sk' | 'en' | 'ru' // user-chosen quiz language
 }
 
 export interface QuizResults {

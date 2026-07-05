@@ -24,7 +24,23 @@ export class SearchService {
       dbQuery = dbQuery.in('category', filters.categories)
     }
 
-    const { data: materials } = await dbQuery
+    // Push text matching into Postgres so we don't pull the whole library
+    // (with full parsed_content) into Node on every search. Sanitize terms to
+    // keep PostgREST's or() filter syntax intact.
+    const terms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .map((t) => t.replace(/[%,()\\*]/g, ''))
+      .filter((t) => t.length > 2)
+
+    if (terms.length > 0) {
+      const orFilter = terms
+        .flatMap((t) => [`title.ilike.%${t}%`, `parsed_content.ilike.%${t}%`])
+        .join(',')
+      dbQuery = dbQuery.or(orFilter)
+    }
+
+    const { data: materials } = await dbQuery.limit(50)
 
     if (!materials) return []
 
