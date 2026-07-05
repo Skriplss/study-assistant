@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import { renderHook, waitFor } from '@testing-library/react'
-import { useAuth, signOut } from '../session'
+import { useAuth, signOut, AuthProvider } from '../session'
 import { supabase } from '@/lib/supabase/client'
 
 // Mock Supabase client
@@ -29,7 +29,7 @@ describe('useAuth', () => {
       data: { subscription: { unsubscribe: jest.fn() } },
     })
 
-    const { result } = renderHook(() => useAuth())
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider })
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
@@ -58,7 +58,7 @@ describe('useAuth', () => {
       data: { subscription: { unsubscribe: jest.fn() } },
     })
 
-    const { result } = renderHook(() => useAuth())
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider })
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
