@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
@@ -61,42 +61,48 @@ export default function MaterialsListWithChat() {
     loadMaterials()
   }, [loadMaterials])
 
-  const handleDelete = async (id: string) => {
-    if (!session) return
-    if (!confirm('Delete this material? This cannot be undone.')) return
+  const handleDelete = useCallback(
+    async (id: string) => {
+      if (!session) return
+      if (!confirm('Delete this material? This cannot be undone.')) return
 
-    try {
-      const response = await fetchWithAuth(session, `/api/materials/${id}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) {
-        const data = await response.json()
-        setError(data.error || 'Failed to delete material')
-        return
+      try {
+        const response = await fetchWithAuth(session, `/api/materials/${id}`, {
+          method: 'DELETE',
+        })
+        if (!response.ok) {
+          const data = await response.json()
+          setError(data.error || 'Failed to delete material')
+          return
+        }
+        setMaterials((prev) => prev.filter((m) => m.id !== id))
+        if (selectedMaterial?.id === id) {
+          setSelectedMaterial(null)
+          setChatHistory([])
+        }
+      } catch {
+        setError('Failed to delete material')
       }
-      setMaterials((prev) => prev.filter((m) => m.id !== id))
-      if (selectedMaterial?.id === id) {
-        setSelectedMaterial(null)
-        setChatHistory([])
-      }
-    } catch {
-      setError('Failed to delete material')
-    }
-  }
+    },
+    [session, selectedMaterial]
+  )
 
-  const handleGenerateQuiz = (materialId: string) => {
+  const handleGenerateQuiz = useCallback((materialId: string) => {
     window.location.href = `/quizzes/generate?materialId=${materialId}`
-  }
+  }, [])
 
-  // Apply filters
-  const getFilteredMaterials = () => {
+  const handleEditMaterial = useCallback((updated: StudyMaterial) => {
+    setMaterials((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
+  }, [])
+
+  // Apply filters — recomputed only when materials or a filter changes,
+  // not on every keystroke-driven re-render.
+  const filteredMaterials = useMemo(() => {
     return materials.filter((m) => {
-      // Search filter
       if (searchQuery && !m.title.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false
       }
 
-      // Status filter
       if (statusFilter !== 'all') {
         const statusMap: Record<FilterStatus, string[]> = {
           all: [],
@@ -109,7 +115,6 @@ export default function MaterialsListWithChat() {
         }
       }
 
-      // File type filter
       if (fileTypeFilter !== 'all') {
         if (fileTypeFilter === 'image') {
           if (!['png', 'jpg', 'jpeg'].includes(m.fileType)) return false
@@ -120,19 +125,17 @@ export default function MaterialsListWithChat() {
 
       return true
     })
-  }
+  }, [materials, searchQuery, statusFilter, fileTypeFilter])
 
   // Group materials
-  const getGroupedMaterials = () => {
-    const filtered = getFilteredMaterials()
-
+  const groupedMaterials = useMemo(() => {
     if (groupBy === 'none') {
-      return { Ungrouped: filtered }
+      return { Ungrouped: filteredMaterials }
     }
 
     const groups: Record<string, StudyMaterial[]> = {}
 
-    filtered.forEach((m) => {
+    filteredMaterials.forEach((m) => {
       let key = 'Other'
 
       if (groupBy === 'category') {
@@ -149,7 +152,7 @@ export default function MaterialsListWithChat() {
     })
 
     return groups
-  }
+  }, [filteredMaterials, groupBy])
 
   // Get active filters for display
   const getActiveFilters = (): string[] => {
@@ -201,9 +204,8 @@ export default function MaterialsListWithChat() {
         }
       )
 
-      const data = await response.json()
-
       if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
         setChatHistory([
           ...newHistory,
           {
@@ -214,10 +216,23 @@ export default function MaterialsListWithChat() {
         return
       }
 
-      setChatHistory([
-        ...newHistory,
-        { role: 'assistant', content: data.message },
-      ])
+      // Stream the assistant reply, appending deltas as they arrive.
+      const reader = response.body?.getReader()
+      if (!reader) {
+        const text = await response.text()
+        setChatHistory([...newHistory, { role: 'assistant', content: text }])
+        return
+      }
+
+      const decoder = new TextDecoder()
+      let acc = ''
+      setChatHistory([...newHistory, { role: 'assistant', content: '' }])
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        acc += decoder.decode(value, { stream: true })
+        setChatHistory([...newHistory, { role: 'assistant', content: acc }])
+      }
     } catch {
       setChatHistory([
         ...newHistory,
@@ -228,7 +243,6 @@ export default function MaterialsListWithChat() {
     }
   }
 
-  const groupedMaterials = getGroupedMaterials()
   const activeFilters = getActiveFilters()
 
   return (
@@ -374,11 +388,7 @@ export default function MaterialsListWithChat() {
                         <MaterialCard
                           material={material}
                           onDelete={handleDelete}
-                          onEdit={(updated) =>
-                            setMaterials((prev) =>
-                              prev.map((m) => (m.id === updated.id ? updated : m))
-                            )
-                          }
+                          onEdit={handleEditMaterial}
                           onGenerateQuiz={handleGenerateQuiz}
                         />
                         {material.parsingStatus === 'completed' && (
