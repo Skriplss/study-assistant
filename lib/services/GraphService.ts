@@ -30,6 +30,15 @@ export class GraphService {
       tagsByMaterial.get(t.material_id)!.push(t.tag)
     })
 
+    // Extract each material's concepts ONCE (n AI calls, bounded concurrency),
+    // then compute pairwise overlap in code. The old approach ran one AI call
+    // per pair — n(n-1)/2 sequential requests, which timed out at any scale.
+    const withContent = materials.filter((m) => m.parsed_content)
+    const conceptsById = new Map<string, string[]>()
+    await this.mapLimit(withContent, 4, async (m) => {
+      conceptsById.set(m.id, await this.extractConcepts(m.parsed_content as string, m.title))
+    })
+
     const connections: {
       user_id: string
       material_id_1: string
@@ -38,31 +47,24 @@ export class GraphService {
       shared_concepts: string[]
     }[] = []
 
-    for (let i = 0; i < materials.length; i++) {
-      for (let j = i + 1; j < materials.length; j++) {
-        const m1 = materials[i]
-        const m2 = materials[j]
+    for (let i = 0; i < withContent.length; i++) {
+      for (let j = i + 1; j < withContent.length; j++) {
+        const m1 = withContent[i]
+        const m2 = withContent[j]
 
-        if (!m1.parsed_content || !m2.parsed_content) continue
+        const c2 = new Set(conceptsById.get(m2.id) || [])
+        const sharedConcepts = (conceptsById.get(m1.id) || []).filter((c) => c2.has(c))
+        if (sharedConcepts.length === 0) continue
 
-        const sharedConcepts = await this.extractSharedConcepts(
-          m1.parsed_content,
-          m2.parsed_content
-        )
-
-        if (sharedConcepts.length > 0) {
-          const tags1 = tagsByMaterial.get(m1.id) || []
-          const tags2 = tagsByMaterial.get(m2.id) || []
-          const strength = this.calculateStrength(sharedConcepts, tags1, tags2)
-          
-          connections.push({
-            user_id: userId,
-            material_id_1: m1.id,
-            material_id_2: m2.id,
-            connection_strength: strength,
-            shared_concepts: sharedConcepts,
-          })
-        }
+        const tags1 = tagsByMaterial.get(m1.id) || []
+        const tags2 = tagsByMaterial.get(m2.id) || []
+        connections.push({
+          user_id: userId,
+          material_id_1: m1.id,
+          material_id_2: m2.id,
+          connection_strength: this.calculateStrength(sharedConcepts, tags1, tags2),
+          shared_concepts: sharedConcepts,
+        })
       }
     }
 
@@ -73,48 +75,42 @@ export class GraphService {
     }
   }
 
-  private static async extractSharedConcepts(
-    content1: string,
-    content2: string
-  ): Promise<string[]> {
-    const text1 = content1.substring(0, 2000)
-    const text2 = content2.substring(0, 2000)
+  /** Run an async fn over items with a bounded number of concurrent workers. */
+  private static async mapLimit<T>(
+    items: T[],
+    limit: number,
+    fn: (item: T) => Promise<void>
+  ): Promise<void> {
+    let cursor = 0
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (cursor < items.length) {
+        await fn(items[cursor++])
+      }
+    })
+    await Promise.all(workers)
+  }
 
-    const prompt = `Extract shared concepts between these two texts. Return only a JSON array of concept strings.
+  /** Extract a normalized set of key concepts for one material (single AI call). */
+  private static async extractConcepts(content: string, title: string): Promise<string[]> {
+    const prompt = `Extract the 8-12 most important concepts or topics from this study material as a JSON array of short lowercase strings. Title: ${title}
 
-Text 1: ${text1}
+Content:
+${content.substring(0, 3000)}
 
-Text 2: ${text2}
-
-Return format: ["concept1", "concept2", ...]`
+Return only a JSON array, e.g. ["concept a", "concept b"]`
 
     try {
-      // Try Gemini first, fallback to Groq
-      let response: string | null | undefined
-      try {
-        console.log('Using Gemini')
-        response = await AIService['callWithRetry'](async () => {
-          const gemini = AIService['getGeminiClient']()
-          const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash' })
-          const result = await model.generateContent(prompt)
-          return result.response.text()
-        })
-      } catch (error) {
-        console.log('Falling back to Groq')
-        response = await AIService['callWithRetry'](async () => {
-          const client = AIService['getGroqClient']()
-          const res = await client.chat.completions.create({
-            model: 'llama-3.1-8b-instant',
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.3,
-            max_tokens: 500,
-          })
-          return res.choices[0]?.message?.content || '[]'
-        })
-      }
+      const response = await AIService.chat([{ role: 'user', content: prompt }], {
+        temperature: 0.2,
+        maxTokens: 300,
+      })
 
       const parsed = JSON.parse((response || '[]').replace(/```json\n?|\n?```/g, ''))
-      return Array.isArray(parsed) ? parsed.slice(0, 10) : []
+      if (!Array.isArray(parsed)) return []
+      return parsed
+        .map((c) => String(c).toLowerCase().trim())
+        .filter(Boolean)
+        .slice(0, 12)
     } catch {
       return []
     }
@@ -136,14 +132,13 @@ Return format: ["concept1", "concept2", ...]`
   static async getGraph(userId: string): Promise<KnowledgeGraph> {
     const db = getSupabaseAdmin()
 
-    const { data: materials } = await db
-      .from('study_materials')
-      .select('id, title, category')
-      .eq('user_id', userId)
-
-    const { data: connections } = await db
-      .from('material_connections')
-      .select('*')
+    const [{ data: materials }, { data: connections }] = await Promise.all([
+      db.from('study_materials').select('id, title, category').eq('user_id', userId),
+      db
+        .from('material_connections')
+        .select('material_id_1, material_id_2, connection_strength, shared_concepts')
+        .eq('user_id', userId),
+    ])
 
     if (!materials) {
       return { nodes: [], edges: [] }
