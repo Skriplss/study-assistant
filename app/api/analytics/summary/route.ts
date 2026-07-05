@@ -22,14 +22,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const timeRange = (searchParams.get('range') as '7d' | '30d' | '90d' | '1y') || '30d'
 
-    const data = await AnalyticsService.getProgressData(user.id, timeRange)
+    const summary = await AnalyticsService.getSummary(user.id, timeRange)
 
-    return NextResponse.json({
-      totalMaterials: data.totalMaterials,
-      totalQuizzes: data.totalQuizzes,
-      totalQuestions: data.totalQuestions,
-      averageScore: data.averageScore,
-    })
+    return NextResponse.json(summary)
   } catch (error) {
     console.error('Get summary error:', error)
     return NextResponse.json({ error: 'Failed to get summary' }, { status: 500 })

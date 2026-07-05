@@ -48,8 +48,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params
-    const existingMaterial = await MaterialService.getMaterial(id)
-    if (existingMaterial.userId !== user.id) {
+    const ownerId = await MaterialService.getMaterialOwner(id)
+    if (ownerId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -82,8 +82,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params
-    const material = await MaterialService.getMaterial(id)
-    if (material.userId !== user.id) {
+    const ownerId = await MaterialService.getMaterialOwner(id)
+    if (ownerId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

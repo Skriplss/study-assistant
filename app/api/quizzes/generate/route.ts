@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { materialId, questionCount, difficulty, questionTypes } = body
+    const { materialId, questionCount, difficulty, questionTypes, language } = body
 
     if (!materialId || !questionCount) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       questionCount,
       difficulty: difficulty || 'mixed',
       questionTypes: questionTypes || ['multiple_choice', 'open_ended'],
+      language: ['sk', 'en', 'ru'].includes(language) ? language : 'en',
     })
 
     return NextResponse.json({ quiz }, { status: 201 })

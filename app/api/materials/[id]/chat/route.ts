@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { AIService } from '@/lib/services/AIService'
+import { selectRelevantContent } from '@/lib/ai/context'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -64,11 +65,15 @@ export async function POST(
       )
     }
 
+    // Only send the passages most relevant to the question — sending the whole
+    // document blows past Groq's free-tier tokens-per-minute limit.
+    const relevantContent = selectRelevantContent(material.parsed_content, message)
+
     // Build system prompt with material content
     const systemPrompt = `You are a helpful study assistant. Answer questions based ONLY on the following material: "${material.title}".
 
 Material content:
-${material.parsed_content}
+${relevantContent}
 
 Instructions:
 - Be concise and clear in your answers
@@ -95,57 +100,33 @@ Instructions:
     // Add current user message
     messages.push({ role: 'user', content: message })
 
-    // Call AI service
-    let responseText: string
+    // Stream the answer token-by-token so the user sees it as it generates,
+    // instead of waiting for the full completion. Higher-TPM Groq model since
+    // chat carries material context.
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          for await (const delta of AIService.streamChat(messages, {
+            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          })) {
+            controller.enqueue(encoder.encode(delta))
+          }
+        } catch (err) {
+          console.error('Chat stream error:', err)
+          controller.enqueue(encoder.encode('\n[Error generating response]'))
+        } finally {
+          controller.close()
+        }
+      },
+    })
 
-    try {
-      // Try Gemini first
-      responseText = await AIService.callWithRetry(async () => {
-        const gemini = AIService.getGeminiClient()
-        const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash' })
-
-        // Convert messages to Gemini format
-        const geminiMessages = messages.map((msg) => ({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content }],
-        }))
-
-        const chat = model.startChat({
-          history: geminiMessages.slice(0, -1),
-        })
-
-        const result = await chat.sendMessage(
-          messages[messages.length - 1].content
-        )
-        const response = result.response
-        return response.text()
-      })
-    } catch (geminiError: any) {
-      console.log('Gemini error, falling back to Groq:', geminiError?.message)
-
-      // Fallback to Groq
-      responseText = await AIService.callWithRetry(async () => {
-        const client = AIService.getGroqClient()
-        const groqMessages = messages.map((msg) => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-        }))
-
-        const response = await client.chat.completions.create({
-          model: 'llama-3.1-8b-instant',
-          messages: groqMessages,
-          temperature: 0.5,
-          max_tokens: 1000,
-        })
-
-        return (
-          response.choices[0]?.message?.content ||
-          'I could not generate a response.'
-        )
-      })
-    }
-
-    return NextResponse.json({ message: responseText })
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+      },
+    })
   } catch (error: any) {
     console.error('Chat error:', error)
     return NextResponse.json(
