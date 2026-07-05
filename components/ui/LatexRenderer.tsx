@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useMemo } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
@@ -10,23 +10,19 @@ interface LatexRendererProps {
 }
 
 export function LatexRenderer({ content, className = '' }: LatexRendererProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!containerRef.current || !content) return
-
+  // Memoize so KaTeX only re-runs when `content` actually changes — otherwise a
+  // parent re-render (e.g. selecting a quiz option) re-parsed every instance.
+  const html = useMemo(() => {
+    if (!content) return ''
     try {
-      // Process the content to find and render LaTeX expressions
-      const processedHTML = renderLatexInText(content)
-      containerRef.current.innerHTML = processedHTML
+      return renderLatexInText(content)
     } catch (error) {
       console.error('LaTeX rendering error:', error)
-      // Fallback to plain text
-      containerRef.current.textContent = content
+      return content
     }
   }, [content])
 
-  return <div ref={containerRef} className={className} />
+  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 /**
