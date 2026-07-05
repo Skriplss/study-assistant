@@ -93,7 +93,7 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
   const progress = ((currentIndex + 1) / quiz.questions.length) * 100
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6">
       <div className="mb-8">
         <div className="flex justify-between text-sm text-muted-foreground mb-3">
           <span className="font-medium">Question {currentIndex + 1} of {quiz.questions.length}</span>
@@ -107,11 +107,11 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
         </div>
       </div>
 
-      <div className="bg-card rounded-xl shadow-lg border border-border p-8 mb-6">
-        <div className="flex justify-between items-start mb-6">
-          <LatexRenderer 
-            content={currentQuestion.questionText} 
-            className="text-2xl font-bold text-foreground pr-4 flex-1"
+      <div className="bg-card rounded-xl shadow-lg border border-border p-5 sm:p-8 mb-6">
+        <div className="flex justify-between items-start gap-2 mb-6">
+          <LatexRenderer
+            content={currentQuestion.questionText}
+            className="text-lg sm:text-2xl font-bold text-foreground flex-1 min-w-0"
           />
           <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
             currentQuestion.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :

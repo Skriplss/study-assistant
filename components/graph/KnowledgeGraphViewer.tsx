@@ -9,6 +9,7 @@ import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { useToast } from '@/components/ui/Toast'
+import { cn } from '@/lib/utils/cn'
 import type { KnowledgeGraph, GraphNode, GraphEdge } from '@/lib/types'
 
 interface NodeTooltip {
@@ -127,6 +128,10 @@ export function KnowledgeGraphViewer() {
   const [colors, setColors] = useState<ThemeColors | null>(null)
   const [width, setWidth] = useState(800)
   const [height, setHeight] = useState(560)
+
+  // Mobile: collapsible side panels (both hidden by default, always shown on lg).
+  const [leftOpen, setLeftOpen] = useState(false)
+  const [rightOpen, setRightOpen] = useState(false)
 
   // Graph controls (right panel).
   const [repel, setRepel] = useState(DEFAULTS.repel)
@@ -340,11 +345,34 @@ export function KnowledgeGraphViewer() {
           </Button>
         </div>
       ) : (
-        <div
-          className="flex border border-border rounded-lg overflow-hidden min-h-[520px]"
-          style={{ height: 'min(80vh, 860px)' }}
-        >
-          <aside className="w-56 shrink-0 border-r border-border bg-card overflow-y-auto p-4 space-y-5">
+        <>
+        {/* Mobile panel toggles */}
+        <div className="flex gap-2 mb-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setLeftOpen((o) => !o)}
+            aria-expanded={leftOpen}
+            className="flex-1 text-xs px-3 py-2 border border-border rounded hover:bg-muted text-foreground transition-colors"
+          >
+            Search &amp; Legend {leftOpen ? '▲' : '▼'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRightOpen((o) => !o)}
+            aria-expanded={rightOpen}
+            className="flex-1 text-xs px-3 py-2 border border-border rounded hover:bg-muted text-foreground transition-colors"
+          >
+            Controls {rightOpen ? '▲' : '▼'}
+          </button>
+        </div>
+
+        <div className="flex flex-col lg:flex-row border border-border rounded-lg overflow-hidden lg:min-h-[520px] lg:h-[min(80vh,860px)]">
+          <aside
+            className={cn(
+              'w-full lg:w-56 shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-card overflow-y-auto p-4 space-y-5',
+              leftOpen ? 'block' : 'hidden lg:block'
+            )}
+          >
             <div>
               <h4 className="font-semibold text-foreground text-sm mb-2">Search</h4>
               <input
@@ -387,7 +415,7 @@ export function KnowledgeGraphViewer() {
             )}
           </aside>
 
-          <div ref={containerRef} className="relative flex-1 min-w-0">
+          <div ref={containerRef} className="relative flex-1 min-w-0 h-[55vh] lg:h-auto">
             {colors && (
               <ForceGraph2D
                 ref={fgRef as never}
@@ -496,7 +524,12 @@ export function KnowledgeGraphViewer() {
             )}
           </div>
 
-          <aside className="w-56 shrink-0 border-l border-border bg-card overflow-y-auto p-4 space-y-5">
+          <aside
+            className={cn(
+              'w-full lg:w-56 shrink-0 border-t lg:border-t-0 lg:border-l border-border bg-card overflow-y-auto p-4 space-y-5',
+              rightOpen ? 'block' : 'hidden lg:block'
+            )}
+          >
             <div>
               <h4 className="font-semibold text-foreground text-sm mb-3">Forces</h4>
               <div className="space-y-3">
@@ -575,6 +608,7 @@ export function KnowledgeGraphViewer() {
             </button>
           </aside>
         </div>
+        </>
       )}
     </div>
   )

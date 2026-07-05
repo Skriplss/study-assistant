@@ -15,13 +15,13 @@ export function QuizResults({ results, questions, onRetake, onBack }: QuizResult
   const isPassed = percentage >= 70
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className={`rounded-xl p-8 mb-8 text-center shadow-lg border-2 ${
+    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+      <div className={`rounded-xl p-6 sm:p-8 mb-8 text-center shadow-lg border-2 ${
         isPassed 
           ? 'bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-800' 
           : 'bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-800'
       }`}>
-        <div className={`text-6xl font-bold mb-3 ${
+        <div className={`text-5xl sm:text-6xl font-bold mb-3 ${
           isPassed ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
         }`}>
           {percentage}%
@@ -61,7 +61,7 @@ export function QuizResults({ results, questions, onRetake, onBack }: QuizResult
           if (!answer) return null
 
           return (
-            <div key={question.id} className="bg-card border-2 border-border rounded-xl shadow-lg p-6">
+            <div key={question.id} className="bg-card border-2 border-border rounded-xl shadow-lg p-4 sm:p-6">
               <div className="flex items-start gap-4 mb-4">
                 <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-md ${
                   answer.isCorrect 
@@ -85,7 +85,7 @@ export function QuizResults({ results, questions, onRetake, onBack }: QuizResult
                 </div>
               </div>
 
-              <div className="ml-14 space-y-4">
+              <div className="sm:ml-14 space-y-4">
                 <div>
                   <span className="text-sm font-bold text-muted-foreground uppercase tracking-wide">Your answer:</span>
                   <div className={`mt-2 p-4 rounded-lg border-2 font-medium ${

@@ -103,12 +103,12 @@ export function AnalyticsDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
         <h2 className="text-2xl font-bold text-foreground">Analytics Dashboard</h2>
         <select
           value={timeRange}
           onChange={(e) => setTimeRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
-          className="px-4 py-2 border-2 border-border bg-card text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full sm:w-auto px-4 py-2 border-2 border-border bg-card text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>
@@ -117,27 +117,27 @@ export function AnalyticsDashboard() {
         </select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
           <div className="text-sm text-muted-foreground font-medium">Total Materials</div>
           <div className="text-3xl font-bold text-foreground mt-2">{data.totalMaterials}</div>
         </div>
-        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
           <div className="text-sm text-muted-foreground font-medium">Total Quizzes</div>
           <div className="text-3xl font-bold text-foreground mt-2">{data.totalQuizzes}</div>
         </div>
-        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
           <div className="text-sm text-muted-foreground font-medium">Total Questions</div>
           <div className="text-3xl font-bold text-foreground mt-2">{data.totalQuestions}</div>
         </div>
-        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
           <div className="text-sm text-muted-foreground font-medium">Average Score</div>
           <div className="text-3xl font-bold text-primary mt-2">{data.averageScore}%</div>
         </div>
       </div>
 
       {scoreChartData.length > 0 && (
-        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
           <h3 className="text-lg font-semibold text-foreground mb-4">Score History</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={scoreChartData}>
@@ -164,13 +164,21 @@ export function AnalyticsDashboard() {
       )}
 
       {tagChartData.length > 0 && (
-        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
           <h3 className="text-lg font-semibold text-foreground mb-4">Performance by Tag</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={tagChartData}>
+            <BarChart data={tagChartData} margin={{ bottom: 24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
-              <XAxis dataKey="name" stroke="rgb(var(--muted-foreground))" />
-              <YAxis domain={[0, 100]} stroke="rgb(var(--muted-foreground))" />
+              <XAxis
+                dataKey="name"
+                stroke="rgb(var(--muted-foreground))"
+                interval={0}
+                angle={-30}
+                textAnchor="end"
+                height={60}
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis domain={[0, 100]} stroke="rgb(var(--muted-foreground))" width={32} />
               <Tooltip 
                 contentStyle={{ 
                   backgroundColor: 'rgb(var(--card))', 
@@ -187,7 +195,7 @@ export function AnalyticsDashboard() {
       )}
 
       {categoryChartData.length > 0 && (
-        <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
+        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
           <h3 className="text-lg font-semibold text-foreground mb-4">Performance by Category</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
@@ -197,7 +205,7 @@ export function AnalyticsDashboard() {
                 cy="50%"
                 labelLine={false}
                 label={(entry) => `${entry.name}: ${entry.value}%`}
-                outerRadius={100}
+                outerRadius="70%"
                 fill="#8884d8"
                 dataKey="value"
               >

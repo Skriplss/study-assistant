@@ -8,6 +8,7 @@ import type { StudyMaterial } from '@/lib/types'
 import MaterialCard from './MaterialCard'
 import MaterialUploader from './MaterialUploader'
 import { Modal } from '@/components/ui/Modal'
+import { cn } from '@/lib/utils/cn'
 
 type FilterStatus = 'all' | 'completed' | 'pending' | 'failed'
 type FilterFileType = 'all' | 'pdf' | 'txt' | 'pptx' | 'image'
@@ -19,6 +20,7 @@ export default function MaterialsListWithChat() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
@@ -165,10 +167,29 @@ export default function MaterialsListWithChat() {
   const activeFilters = getActiveFilters()
 
   return (
-    <div className="flex overflow-hidden bg-background" style={{ height: 'calc(100vh - 64px - 80px)' }}>
+    <div className="flex flex-col md:flex-row md:h-[calc(100vh-144px)] md:overflow-hidden bg-background">
+      {/* Mobile filter toggle */}
+      <button
+        type="button"
+        onClick={() => setFiltersOpen((o) => !o)}
+        aria-expanded={filtersOpen}
+        className="md:hidden flex items-center justify-between border-b border-border bg-card px-4 py-3 text-sm font-medium"
+      >
+        <span>
+          Filter &amp; Group
+          {activeFilters.length > 0 && ` (${activeFilters.length})`}
+        </span>
+        <span className="text-muted-foreground">{filtersOpen ? '▲' : '▼'}</span>
+      </button>
+
       {/* Left Panel - Filters */}
-      <div className="w-[220px] border-r border-border bg-card p-4 overflow-y-auto flex-shrink-0">
-        <h2 className="text-lg font-bold mb-4">Filter & Group</h2>
+      <div
+        className={cn(
+          'border-b md:border-b-0 md:border-r border-border bg-card p-4 overflow-y-auto md:w-[220px] md:flex-shrink-0',
+          filtersOpen ? 'block' : 'hidden md:block'
+        )}
+      >
+        <h2 className="hidden md:block text-lg font-bold mb-4">Filter & Group</h2>
 
         {/* Search */}
         <div className="mb-4">
@@ -262,7 +283,7 @@ export default function MaterialsListWithChat() {
       </div>
 
       {/* Center Panel - Materials List */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 md:overflow-y-auto p-4 sm:p-6">
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">Study materials</h1>
