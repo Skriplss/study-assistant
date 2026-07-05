@@ -38,14 +38,32 @@ export function AnalyticsDashboard() {
     }
   }
 
-  const scoreChartData = useMemo(
-    () =>
-      (data?.scoreHistory ?? []).map(s => ({
-        date: new Date(s.date).toLocaleDateString(),
-        score: Math.round(s.score),
-      })),
-    [data]
-  )
+  const scoreChartData = useMemo(() => {
+    const byDay = new Map<string, { key: number; label: string; sum: number; count: number }>()
+    for (const s of data?.scoreHistory ?? []) {
+      const d = new Date(s.date)
+      const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+      const entry = byDay.get(String(dayKey))
+      if (entry) {
+        entry.sum += s.score
+        entry.count += 1
+      } else {
+        byDay.set(String(dayKey), {
+          key: dayKey,
+          label: d.toLocaleDateString(),
+          sum: s.score,
+          count: 1,
+        })
+      }
+    }
+    return Array.from(byDay.values())
+      .sort((a, b) => a.key - b.key)
+      .map(e => ({
+        date: e.label,
+        score: Math.round(e.sum / e.count),
+        quizzes: e.count,
+      }))
+  }, [data])
 
   const tagChartData = useMemo(
     () =>
@@ -125,13 +143,17 @@ export function AnalyticsDashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
               <XAxis dataKey="date" stroke="rgb(var(--muted-foreground))" />
               <YAxis domain={[0, 100]} stroke="rgb(var(--muted-foreground))" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'rgb(var(--card))', 
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgb(var(--card))',
                   border: '1px solid rgb(var(--border))',
                   borderRadius: '8px',
                   color: 'rgb(var(--foreground))'
-                }} 
+                }}
+                formatter={(value: number, _name, props) => [
+                  `${value}%${props.payload.quizzes > 1 ? ` (avg of ${props.payload.quizzes} quizzes)` : ''}`,
+                  'Score',
+                ]}
               />
               <Legend />
               <Line type="monotone" dataKey="score" stroke="rgb(var(--primary))" strokeWidth={3} />
