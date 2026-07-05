@@ -19,7 +19,7 @@ const KnowledgeGraphViewer = dynamic(
 
 export default function GraphPage() {
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+    <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-8">
       <KnowledgeGraphViewer />
     </div>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import Link from 'next/link'
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d'
 import { forceX, forceY } from 'd3-force'
 import { useAuth } from '@/lib/auth/session'
@@ -70,6 +71,12 @@ const DEFAULTS = {
   showOrphans: true,
 }
 
+const CATEGORY_PALETTE = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+]
+const UNCATEGORIZED_COLOR = '#94a3b8'
+
 function Slider({
   label,
   value,
@@ -115,6 +122,7 @@ export function KnowledgeGraphViewer() {
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [colors, setColors] = useState<ThemeColors | null>(null)
   const [width, setWidth] = useState(800)
+  const [height, setHeight] = useState(560)
 
   // Graph controls (right panel).
   const [repel, setRepel] = useState(DEFAULTS.repel)
@@ -123,6 +131,7 @@ export function KnowledgeGraphViewer() {
   const [labelThreshold, setLabelThreshold] = useState(DEFAULTS.labelThreshold)
   const [minStrength, setMinStrength] = useState(DEFAULTS.minStrength)
   const [showOrphans, setShowOrphans] = useState(DEFAULTS.showOrphans)
+  const [search, setSearch] = useState('')
 
   const resetControls = () => {
     setRepel(DEFAULTS.repel)
@@ -150,8 +159,9 @@ export function KnowledgeGraphViewer() {
     const el = containerRef.current
     if (!el) return
     const ro = new ResizeObserver(entries => {
-      const w = entries[0]?.contentRect.width
-      if (w) setWidth(w)
+      const rect = entries[0]?.contentRect
+      if (rect?.width) setWidth(rect.width)
+      if (rect?.height) setHeight(rect.height)
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -234,6 +244,40 @@ export function KnowledgeGraphViewer() {
     return set
   }, [hoverId, neighbors])
 
+  // Stable color per category + whether any node is uncategorized (for legend).
+  const { categoryColors, hasUncategorized } = useMemo(() => {
+    const cats = Array.from(
+      new Set((graph?.nodes ?? []).map(n => n.data.category).filter(Boolean) as string[])
+    ).sort()
+    const map = new Map<string, string>()
+    cats.forEach((c, i) => map.set(c, CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]))
+    const hasUncategorized = (graph?.nodes ?? []).some(n => !n.data.category)
+    return { categoryColors: map, hasUncategorized }
+  }, [graph])
+
+  const nodeColor = useCallback(
+    (category: string | null) => (category && categoryColors.get(category)) || UNCATEGORIZED_COLOR,
+    [categoryColors]
+  )
+
+  // Node ids matching the search query (null when the box is empty).
+  const searchIds = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return null
+    const set = new Set<string>()
+    for (const n of graph?.nodes ?? []) {
+      if (n.label.toLowerCase().includes(q)) set.add(n.id)
+    }
+    return set
+  }, [search, graph])
+
+  // Zoom to the matches when a search narrows the graph.
+  useEffect(() => {
+    const fg = fgRef.current
+    if (!fg || !searchIds || searchIds.size === 0) return
+    fg.zoomToFit(500, 80, (node: { id?: string | number }) => searchIds.has(String(node.id)))
+  }, [searchIds])
+
   const handleAnalyze = async () => {
     if (!session) return
     setAnalyzing(true)
@@ -301,16 +345,59 @@ export function KnowledgeGraphViewer() {
         </div>
       ) : (
         <div
-          className="flex border border-border rounded-lg overflow-hidden"
-          style={{ height: 560 }}
+          className="flex border border-border rounded-lg overflow-hidden min-h-[520px]"
+          style={{ height: 'min(80vh, 860px)' }}
         >
+          <aside className="w-56 shrink-0 border-r border-border bg-card overflow-y-auto p-4 space-y-5">
+            <div>
+              <h4 className="font-semibold text-foreground text-sm mb-2">Search</h4>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Find a material…"
+                className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              {searchIds && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {searchIds.size} match{searchIds.size === 1 ? '' : 'es'}
+                </p>
+              )}
+            </div>
+
+            {(categoryColors.size > 0 || hasUncategorized) && (
+              <div>
+                <h4 className="font-semibold text-foreground text-sm mb-3">Categories</h4>
+                <ul className="space-y-1.5">
+                  {[...categoryColors].map(([cat, color]) => (
+                    <li key={cat} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="truncate">{cat}</span>
+                    </li>
+                  ))}
+                  {hasUncategorized && (
+                    <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: UNCATEGORIZED_COLOR }}
+                      />
+                      <span className="truncate">Uncategorized</span>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </aside>
+
           <div ref={containerRef} className="relative flex-1 min-w-0">
             {colors && (
               <ForceGraph2D
                 ref={fgRef as never}
                 graphData={graphData}
                 width={width}
-                height={560}
+                height={height}
                 backgroundColor={colors.bg}
                 cooldownTicks={120}
                 onEngineStop={() => {
@@ -344,21 +431,29 @@ export function KnowledgeGraphViewer() {
                   ctx.fill()
                 }}
                 nodeCanvasObject={(node: FGNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-                  const active = !highlightNodes || highlightNodes.has(node.id)
+                  const matchesHover = !highlightNodes || highlightNodes.has(node.id)
+                  const matchesSearch = !searchIds || searchIds.has(node.id)
+                  const active = matchesHover && matchesSearch
                   const isHover = node.id === hoverId
+                  const isSearchHit = searchIds?.has(node.id) ?? false
                   const r = node.r * nodeScale
+                  const fill = nodeColor(node.category)
 
                   ctx.save()
-                  ctx.globalAlpha = active ? 1 : 0.12
+                  ctx.globalAlpha = active ? 1 : 0.1
                   ctx.beginPath()
                   ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
-                  ctx.fillStyle = colors.primary
-                  ctx.shadowColor = colors.primary
-                  ctx.shadowBlur = isHover ? 26 : active ? 12 : 0
+                  ctx.fillStyle = fill
+                  ctx.shadowColor = fill
+                  ctx.shadowBlur = isHover ? 26 : isSearchHit ? 22 : active ? 12 : 0
                   ctx.fill()
                   ctx.restore()
 
-                  const showLabel = isHover || globalScale > labelThreshold || (highlightNodes?.has(node.id) ?? false)
+                  const showLabel =
+                    isHover ||
+                    isSearchHit ||
+                    globalScale > labelThreshold ||
+                    (highlightNodes?.has(node.id) ?? false)
                   if (showLabel) {
                     const fontSize = Math.max(11 / globalScale, 2)
                     ctx.font = `${fontSize}px Inter, system-ui, sans-serif`
@@ -380,11 +475,11 @@ export function KnowledgeGraphViewer() {
                 {tooltip.category && (
                   <p className="text-xs text-muted-foreground mb-2">{tooltip.category}</p>
                 )}
-                <p className="text-xs text-blue-500 mb-2">
+                <p className="text-xs text-muted-foreground mb-2">
                   {tooltip.connectionCount} connection(s)
                 </p>
                 {tooltip.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1 mb-2">
                     {tooltip.tags.map(tag => (
                       <span
                         key={tag}
@@ -395,6 +490,12 @@ export function KnowledgeGraphViewer() {
                     ))}
                   </div>
                 )}
+                <Link
+                  href={`/materials/${tooltip.nodeId}`}
+                  className="text-xs font-medium text-blue-500 hover:underline inline-block"
+                >
+                  Open material →
+                </Link>
               </div>
             )}
           </div>
