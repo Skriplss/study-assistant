@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth/session'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { user, session, loading } = useAuth()
+  const lastSyncedToken = useRef<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -15,7 +16,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [loading, user, router])
 
   useEffect(() => {
-    if (!session) return
+    // Only re-sync the cookie when the access token actually changes — the
+    // session object identity churns on every refresh/subscription event.
+    if (!session || session.access_token === lastSyncedToken.current) return
+    lastSyncedToken.current = session.access_token
 
     fetch('/api/auth/sync-session', {
       method: 'POST',
