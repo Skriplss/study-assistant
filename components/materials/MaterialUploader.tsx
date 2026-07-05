@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth/session'
 import { useMetadataSuggestions } from '@/lib/hooks/useMetadataSuggestions'
 import TagInput from './TagInput'
 import CategorySelector from './CategorySelector'
+import { Button } from '@/components/ui/Button'
 
 interface MaterialUploaderProps {
   onUploadComplete?: (materialId: string) => void
@@ -166,15 +167,15 @@ export default function MaterialUploader({
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-lg p-8 text-center transition ${
           isDragging
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400'
+            ? 'border-primary bg-primary/10'
+            : 'border-border hover:border-muted-foreground'
         }`}
       >
         {!file ? (
           <>
             <div className="mb-4">
               <svg
-                className="mx-auto h-12 w-12 text-gray-400"
+                className="mx-auto h-12 w-12 text-muted-foreground"
                 stroke="currentColor"
                 fill="none"
                 viewBox="0 0 48 48"
@@ -189,7 +190,7 @@ export default function MaterialUploader({
             </div>
             <p className="text-lg mb-2">
               Drag and drop your file here, or{' '}
-              <label className="text-blue-600 hover:underline cursor-pointer">
+              <label className="text-primary hover:underline cursor-pointer">
                 browse
                 <input
                   type="file"
@@ -200,7 +201,7 @@ export default function MaterialUploader({
                 />
               </label>
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Supported formats: PDF, TXT, MD, PPTX, PNG, JPG, JPEG (max {maxFileSize / 1024 / 1024}
               MB)
             </p>
@@ -223,7 +224,7 @@ export default function MaterialUploader({
               </div>
               <div className="text-left min-w-0 flex-1">
                 <p className="font-medium truncate">{file.name}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {(file.size / 1024).toFixed(2)} KB
                 </p>
               </div>
@@ -247,9 +248,9 @@ export default function MaterialUploader({
             <span>Uploading...</span>
             <span>{uploadProgress}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-secondary rounded-full h-2">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-primary h-2 rounded-full transition-all duration-300"
               style={{ width: `${uploadProgress}%` }}
             />
           </div>
@@ -265,7 +266,7 @@ export default function MaterialUploader({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-background text-foreground placeholder:text-muted-foreground"
+              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground placeholder:text-muted-foreground"
               placeholder="Enter material title"
             />
           </div>
@@ -296,12 +297,12 @@ export default function MaterialUploader({
 
       {/* Error Message */}
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm flex justify-between items-center">
+        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm flex justify-between items-center">
           <span>{error}</span>
           {isUploading && (
             <button
               onClick={handleRetry}
-              className="text-red-800 underline hover:no-underline"
+              className="underline hover:no-underline font-medium"
             >
               Retry
             </button>
@@ -311,13 +312,9 @@ export default function MaterialUploader({
 
       {/* Upload Button */}
       {file && !isUploading && (
-        <button
-          onClick={handleUpload}
-          disabled={!title.trim()}
-          className="w-full py-3 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-        >
+        <Button onClick={handleUpload} disabled={!title.trim()} size="lg" className="w-full">
           Upload Material
-        </button>
+        </Button>
       )}
     </div>
   )

@@ -6,33 +6,25 @@ import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import type { StudyMaterial } from '@/lib/types'
 import MaterialCard from './MaterialCard'
+import MaterialUploader from './MaterialUploader'
+import { Modal } from '@/components/ui/Modal'
 
 type FilterStatus = 'all' | 'completed' | 'pending' | 'failed'
 type FilterFileType = 'all' | 'pdf' | 'txt' | 'pptx' | 'image'
 type GroupBy = 'none' | 'category' | 'fileType' | 'date'
-
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-}
 
 export default function MaterialsListWithChat() {
   const { session } = useAuth()
   const [materials, setMaterials] = useState<StudyMaterial[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
   const [groupBy, setGroupBy] = useState<GroupBy>('none')
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all')
   const [fileTypeFilter, setFileTypeFilter] = useState<FilterFileType>('all')
-
-  // Chat states
-  const [selectedMaterial, setSelectedMaterial] = useState<StudyMaterial | null>(null)
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
-  const [chatInput, setChatInput] = useState('')
-  const [chatLoading, setChatLoading] = useState(false)
 
   const loadMaterials = useCallback(async () => {
     if (!session) return
@@ -76,15 +68,11 @@ export default function MaterialsListWithChat() {
           return
         }
         setMaterials((prev) => prev.filter((m) => m.id !== id))
-        if (selectedMaterial?.id === id) {
-          setSelectedMaterial(null)
-          setChatHistory([])
-        }
       } catch {
         setError('Failed to delete material')
       }
     },
-    [session, selectedMaterial]
+    [session]
   )
 
   const handleGenerateQuiz = useCallback((materialId: string) => {
@@ -94,6 +82,11 @@ export default function MaterialsListWithChat() {
   const handleEditMaterial = useCallback((updated: StudyMaterial) => {
     setMaterials((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
   }, [])
+
+  const handleUploadComplete = useCallback(() => {
+    setUploadOpen(false)
+    loadMaterials()
+  }, [loadMaterials])
 
   // Apply filters — recomputed only when materials or a filter changes,
   // not on every keystroke-driven re-render.
@@ -167,80 +160,6 @@ export default function MaterialsListWithChat() {
     if (filter.startsWith('Status:')) setStatusFilter('all')
     if (filter.startsWith('Type:')) setFileTypeFilter('all')
     if (filter.startsWith('Search:')) setSearchQuery('')
-  }
-
-  // Chat handlers
-  const handleSelectMaterial = (material: StudyMaterial) => {
-    setSelectedMaterial(material)
-    setChatHistory([])
-    setChatInput('')
-  }
-
-  const handleSendMessage = async () => {
-    if (!chatInput.trim() || !selectedMaterial || !session) return
-
-    const userMessage = chatInput.trim()
-    setChatInput('')
-    setChatLoading(true)
-
-    // Add user message to history
-    const newHistory: ChatMessage[] = [
-      ...chatHistory,
-      { role: 'user', content: userMessage },
-    ]
-    setChatHistory(newHistory)
-
-    try {
-      const response = await fetchWithAuth(
-        session,
-        `/api/materials/${selectedMaterial.id}/chat`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: userMessage,
-            history: chatHistory.slice(-10),
-          }),
-        }
-      )
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        setChatHistory([
-          ...newHistory,
-          {
-            role: 'assistant',
-            content: `Error: ${data.error || 'Failed to get response'}`,
-          },
-        ])
-        return
-      }
-
-      // Stream the assistant reply, appending deltas as they arrive.
-      const reader = response.body?.getReader()
-      if (!reader) {
-        const text = await response.text()
-        setChatHistory([...newHistory, { role: 'assistant', content: text }])
-        return
-      }
-
-      const decoder = new TextDecoder()
-      let acc = ''
-      setChatHistory([...newHistory, { role: 'assistant', content: '' }])
-      for (;;) {
-        const { done, value } = await reader.read()
-        if (done) break
-        acc += decoder.decode(value, { stream: true })
-        setChatHistory([...newHistory, { role: 'assistant', content: acc }])
-      }
-    } catch {
-      setChatHistory([
-        ...newHistory,
-        { role: 'assistant', content: 'Error: Failed to send message' },
-      ])
-    } finally {
-      setChatLoading(false)
-    }
   }
 
   const activeFilters = getActiveFilters()
@@ -347,31 +266,31 @@ export default function MaterialsListWithChat() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">Study materials</h1>
-            <Link
-              href="/materials/upload"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+            <button
+              onClick={() => setUploadOpen(true)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
             >
-              Upload material
-            </Link>
+              + Upload
+            </button>
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
               {error}
             </p>
           )}
 
           {loading ? (
-            <p className="text-center text-gray-500 py-12">Loading materials…</p>
+            <p className="text-center text-muted-foreground py-12">Loading materials…</p>
           ) : Object.keys(groupedMaterials).length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-gray-300 rounded-lg">
-              <p className="text-gray-600 mb-4">No materials found.</p>
-              <Link
-                href="/materials/upload"
-                className="text-blue-600 hover:underline font-medium"
+            <div className="text-center py-16 border border-dashed border-border rounded-lg">
+              <p className="text-muted-foreground mb-4">No materials found.</p>
+              <button
+                onClick={() => setUploadOpen(true)}
+                className="text-primary hover:underline font-medium"
               >
                 Upload your first file
-              </Link>
+              </button>
             </div>
           ) : (
             <div className="space-y-8">
@@ -392,16 +311,12 @@ export default function MaterialsListWithChat() {
                           onGenerateQuiz={handleGenerateQuiz}
                         />
                         {material.parsingStatus === 'completed' && (
-                          <button
-                            onClick={() => handleSelectMaterial(material)}
-                            className={`absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded shadow-sm transition-colors ${
-                              selectedMaterial?.id === material.id
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                            }`}
+                          <Link
+                            href={`/chat?material=${material.id}`}
+                            className="absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded shadow-sm transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
                           >
                             Chat
-                          </button>
+                          </Link>
                         )}
                       </div>
                     ))}
@@ -413,101 +328,9 @@ export default function MaterialsListWithChat() {
         </div>
       </div>
 
-      {/* Right Panel - Chat */}
-      <div className="w-[650px] border-l border-border bg-card flex flex-col flex-shrink-0">
-        {!selectedMaterial ? (
-          <div className="flex-1 flex items-center justify-center p-6 text-center">
-            <p className="text-muted-foreground">
-              Select a material to chat with it
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Chat Header */}
-            <div className="p-4 border-b border-border">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm truncate" key={selectedMaterial.id}>
-                    {selectedMaterial.title}
-                  </h3>
-                  <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-secondary rounded">
-                    {selectedMaterial.fileType.toUpperCase()}
-                  </span>
-                </div>
-                <button
-                  onClick={() => {
-                    setSelectedMaterial(null)
-                    setChatHistory([])
-                  }}
-                  className="ml-2 text-muted-foreground hover:text-foreground text-xl"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {chatHistory.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center mt-8">
-                  Ask questions about this material
-                </p>
-              ) : (
-                chatHistory.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[85%] px-3 py-2 rounded-lg text-sm break-words overflow-wrap-anywhere ${
-                        msg.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-secondary text-secondary-foreground'
-                      }`}
-                    >
-                      {msg.content}
-                    </div>
-                  </div>
-                ))
-              )}
-              {chatLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-secondary px-3 py-2 rounded-lg text-sm">
-                    <span className="inline-block animate-pulse">Thinking...</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Chat Input */}
-            <div className="p-4 border-t border-border">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSendMessage()
-                    }
-                  }}
-                  placeholder="Ask a question..."
-                  disabled={chatLoading}
-                  className="flex-1 px-3 py-2 text-sm border border-border rounded-md bg-background disabled:opacity-50"
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={chatLoading || !chatInput.trim()}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      <Modal open={uploadOpen} onClose={() => setUploadOpen(false)} title="Upload material">
+        <MaterialUploader onUploadComplete={handleUploadComplete} />
+      </Modal>
     </div>
   )
 }

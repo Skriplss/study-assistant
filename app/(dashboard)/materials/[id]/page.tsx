@@ -128,10 +128,21 @@ export default function MaterialDetailPage() {
             type="button"
             onClick={handleParse}
             disabled={isParsing}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm font-medium"
           >
             {isParsing ? 'Parsing…' : 'Parse file'}
           </button>
+        </div>
+      )}
+
+      {material.parsingStatus === 'completed' && (
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/chat?material=${material.id}`}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium inline-flex items-center gap-1"
+          >
+            💬 Chat about this
+          </Link>
         </div>
       )}
 

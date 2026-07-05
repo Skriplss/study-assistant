@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { Spinner } from '@/components/ui/Spinner'
 
 const KnowledgeGraphViewer = dynamic(
   () => import('@/components/graph/KnowledgeGraphViewer').then(mod => ({ default: mod.KnowledgeGraphViewer })),
@@ -9,7 +10,7 @@ const KnowledgeGraphViewer = dynamic(
     loading: () => (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+          <Spinner size="lg" className="text-primary" />
           <p className="mt-4 text-muted-foreground">Loading graph...</p>
         </div>
       </div>

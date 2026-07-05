@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Button } from '@/components/ui/Button'
 
 export default function ResetPasswordForm() {
   const [email, setEmail] = useState('')
@@ -42,7 +43,7 @@ export default function ResetPasswordForm() {
     <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-md">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold mb-2">Reset Password</h2>
-        <p className="text-gray-600 text-sm">
+        <p className="text-muted-foreground text-sm">
           Enter your email address and we&apos;ll send you a link to reset your
           password.
         </p>
@@ -58,14 +59,14 @@ export default function ResetPasswordForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
           placeholder="your@email.com"
           disabled={isLoading}
         />
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm">
           {error}
         </div>
       )}
@@ -77,17 +78,13 @@ export default function ResetPasswordForm() {
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-      >
+      <Button type="submit" disabled={isLoading} loading={isLoading} className="w-full">
         {isLoading ? 'Sending...' : 'Send Reset Link'}
-      </button>
+      </Button>
 
       <div className="text-center text-sm">
         Remember your password?{' '}
-        <a href="/auth/login" className="text-blue-600 hover:underline">
+        <a href="/auth/login" className="text-primary hover:underline">
           Login
         </a>
       </div>

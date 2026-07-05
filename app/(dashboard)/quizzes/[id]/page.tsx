@@ -6,6 +6,7 @@ import { QuizTaker } from '@/components/quizzes/QuizTaker'
 import { QuizResults } from '@/components/quizzes/QuizResults'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
+import { Spinner } from '@/components/ui/Spinner'
 import type { Quiz, QuizResults as Results } from '@/lib/types'
 
 export default function QuizPage() {
@@ -56,7 +57,7 @@ export default function QuizPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <Spinner size="lg" className="text-primary mx-auto mb-4" />
           <p className="text-muted-foreground font-medium">Loading quiz...</p>
         </div>
       </div>
@@ -84,7 +85,7 @@ export default function QuizPage() {
 
   return (
     <div className="min-h-screen bg-background py-8">
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4">
         <div className="mb-8 bg-card border border-border rounded-xl p-6 shadow-lg">
           <h1 className="text-3xl font-bold mb-4 text-foreground">{quiz.title}</h1>
           <div className="flex flex-wrap gap-3 text-sm">

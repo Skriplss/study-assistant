@@ -7,6 +7,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { Spinner } from '@/components/ui/Spinner'
 import type { ProgressData } from '@/lib/types'
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
@@ -87,7 +88,7 @@ export function AnalyticsDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <Spinner size="lg" className="text-primary" />
       </div>
     )
   }
@@ -95,7 +96,7 @@ export function AnalyticsDashboard() {
   if (!data) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">No analytics data available</p>
+        <p className="text-muted-foreground">No analytics data available</p>
       </div>
     )
   }

@@ -281,7 +281,7 @@ function MaterialCard({
                 type="button"
                 onClick={handleParse}
                 disabled={isParsing || currentMaterial.parsingStatus === 'processing'}
-                className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
                 title="Parse material"
               >
                 {isParsing || currentMaterial.parsingStatus === 'processing' ? 'Parsing…' : 'Parse'}

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { SearchResult } from '@/lib/types'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
+import { Spinner } from '@/components/ui/Spinner'
 
 interface SearchBarProps {
   onResults: (results: SearchResult[]) => void
@@ -60,7 +61,7 @@ export function SearchBar({ onResults }: SearchBarProps) {
         </svg>
         {searching && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            <Spinner size="sm" className="text-muted-foreground" />
           </div>
         )}
       </div>

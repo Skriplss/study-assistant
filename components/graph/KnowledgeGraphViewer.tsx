@@ -6,6 +6,9 @@ import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d'
 import { forceX, forceY } from 'd3-force'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
+import { Button } from '@/components/ui/Button'
+import { Spinner } from '@/components/ui/Spinner'
+import { useToast } from '@/components/ui/Toast'
 import type { KnowledgeGraph, GraphNode, GraphEdge } from '@/lib/types'
 
 interface NodeTooltip {
@@ -115,6 +118,7 @@ function Slider({
 
 export function KnowledgeGraphViewer() {
   const { session } = useAuth()
+  const { toast } = useToast()
   const [graph, setGraph] = useState<KnowledgeGraph | null>(null)
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
@@ -285,7 +289,7 @@ export function KnowledgeGraphViewer() {
       await fetchWithAuth(session, '/api/graph/analyze', { method: 'POST' })
       await loadGraph()
     } catch {
-      alert('Failed to analyze connections')
+      toast({ message: 'Failed to analyze connections', variant: 'error' })
     } finally {
       setAnalyzing(false)
     }
@@ -307,7 +311,7 @@ export function KnowledgeGraphViewer() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <Spinner size="lg" className="text-primary" />
       </div>
     )
   }
@@ -321,13 +325,9 @@ export function KnowledgeGraphViewer() {
             {graph?.nodes.length ?? 0} materials, {graph?.edges.length ?? 0} connections
           </p>
         </div>
-        <button
-          onClick={handleAnalyze}
-          disabled={analyzing}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300"
-        >
-          {analyzing ? 'Analyzing...' : 'Analyze Connections'}
-        </button>
+        <Button onClick={handleAnalyze} disabled={analyzing} loading={analyzing}>
+          {analyzing ? 'Analyzing…' : 'Analyze Connections'}
+        </Button>
       </div>
 
       {!graph || graph.nodes.length === 0 ? (
@@ -335,13 +335,9 @@ export function KnowledgeGraphViewer() {
           <p className="text-muted-foreground mb-4">
             No materials to display. Upload and parse materials first.
           </p>
-          <button
-            onClick={handleAnalyze}
-            disabled={analyzing}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
+          <Button onClick={handleAnalyze} disabled={analyzing} loading={analyzing}>
             Analyze Connections
-          </button>
+          </Button>
         </div>
       ) : (
         <div

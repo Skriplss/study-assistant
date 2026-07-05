@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import { LatexRenderer, hasLatex } from '@/components/ui/LatexRenderer'
+import { useToast } from '@/components/ui/Toast'
 import type { Quiz, Answer } from '@/lib/types'
 
 interface QuizTakerProps {
@@ -13,6 +14,7 @@ interface QuizTakerProps {
 
 export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
   const { session } = useAuth()
+  const { toast } = useToast()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Map<string, Answer>>(new Map())
   const [userAnswer, setUserAnswer] = useState('')
@@ -51,7 +53,7 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
       const answer: Answer = data.answer ?? data
       setAnswers(new Map(answers.set(currentQuestion.id, answer)))
     } catch {
-      alert('Failed to submit answer')
+      toast({ message: 'Failed to submit answer', variant: 'error' })
     } finally {
       setSubmitting(false)
     }
@@ -84,7 +86,7 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
 
       onComplete()
     } catch {
-      alert('Failed to complete quiz')
+      toast({ message: 'Failed to complete quiz', variant: 'error' })
     }
   }
 
