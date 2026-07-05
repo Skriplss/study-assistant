@@ -32,23 +32,29 @@ export class AnalyticsService {
     const db = getSupabaseAdmin()
     const startDate = this.getStartDate(timeRange)
 
-    const { data: snapshots } = await db
-      .from('progress_snapshots')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('completed_at', startDate.toISOString())
-      .order('completed_at')
-
-    const { data: materials } = await db
-      .from('study_materials')
-      .select('id')
-      .eq('user_id', userId)
-
-    const { data: quizzes } = await db
-      .from('quizzes')
-      .select('id, total_questions')
-      .eq('user_id', userId)
-      .gte('created_at', startDate.toISOString())
+    // All five reads are independent — run them concurrently.
+    const [
+      { data: snapshots },
+      { data: materials },
+      { data: quizzes },
+      performanceByTag,
+      performanceByCategory,
+    ] = await Promise.all([
+      db
+        .from('progress_snapshots')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('completed_at', startDate.toISOString())
+        .order('completed_at'),
+      db.from('study_materials').select('id').eq('user_id', userId),
+      db
+        .from('quizzes')
+        .select('id, total_questions')
+        .eq('user_id', userId)
+        .gte('created_at', startDate.toISOString()),
+      this.getPerformanceByTag(userId, startDate),
+      this.getPerformanceByCategory(userId, startDate),
+    ])
 
     const scores = snapshots?.map(s => s.score) || []
     const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
@@ -59,8 +65,53 @@ export class AnalyticsService {
       totalQuestions: quizzes?.reduce((sum, q) => sum + q.total_questions, 0) || 0,
       averageScore: Math.round(avgScore * 10) / 10,
       scoreHistory: this.formatScoreHistory(snapshots || []),
-      performanceByTag: await this.getPerformanceByTag(userId, startDate),
-      performanceByCategory: await this.getPerformanceByCategory(userId, startDate),
+      performanceByTag,
+      performanceByCategory,
+    }
+  }
+
+  /**
+   * Lightweight totals for the summary card — skips the two perf RPCs and the
+   * full snapshot fetch that getProgressData does (and the summary discards).
+   */
+  static async getSummary(
+    userId: string,
+    timeRange: '7d' | '30d' | '90d' | '1y' = '30d'
+  ): Promise<{
+    totalMaterials: number
+    totalQuizzes: number
+    totalQuestions: number
+    averageScore: number
+  }> {
+    const db = getSupabaseAdmin()
+    const startDate = this.getStartDate(timeRange)
+
+    const [{ data: scoreRows }, { count: materialCount }, { data: quizzes }] =
+      await Promise.all([
+        db
+          .from('progress_snapshots')
+          .select('score')
+          .eq('user_id', userId)
+          .gte('completed_at', startDate.toISOString()),
+        db
+          .from('study_materials')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId),
+        db
+          .from('quizzes')
+          .select('id, total_questions')
+          .eq('user_id', userId)
+          .gte('created_at', startDate.toISOString()),
+      ])
+
+    const scores = scoreRows?.map(s => s.score) || []
+    const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+
+    return {
+      totalMaterials: materialCount || 0,
+      totalQuizzes: quizzes?.length || 0,
+      totalQuestions: quizzes?.reduce((sum, q) => sum + q.total_questions, 0) || 0,
+      averageScore: Math.round(avgScore * 10) / 10,
     }
   }
 
