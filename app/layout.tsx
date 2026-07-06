@@ -1,8 +1,22 @@
 import type { Metadata } from 'next'
+import { Inter, Instrument_Serif } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/lib/contexts/ThemeContext'
 import { AuthProvider } from '@/lib/auth/session'
 import { ToastProvider } from '@/components/ui/Toast'
+
+const sans = Inter({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-sans',
+  display: 'swap',
+})
+
+const serif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-serif',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'AI Study Assistant',
@@ -16,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={`${sans.variable} ${serif.variable}`} suppressHydrationWarning>
       <body suppressHydrationWarning>
         <ThemeProvider>
           <AuthProvider>

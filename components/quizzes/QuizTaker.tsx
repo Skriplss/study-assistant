@@ -119,20 +119,21 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
 
         <div className="flex flex-wrap gap-2 mt-4">
           {quiz.questions.map((q, i) => {
-            const done = answers.has(q.id)
+            const ans = answers.get(q.id)
             const active = i === currentIndex
+            const state = active ? 'active' : !ans ? 'todo' : ans.isCorrect ? 'correct' : 'wrong'
+            const styles = {
+              active: 'border-primary bg-primary text-primary-foreground shadow-md',
+              correct: 'border-green-400 dark:border-green-700 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
+              wrong: 'border-red-400 dark:border-red-700 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+              todo: 'border-border bg-card text-muted-foreground hover:border-primary/50',
+            }[state]
             return (
               <button
                 key={q.id}
                 onClick={() => goTo(i)}
-                aria-label={`Question ${i + 1}${done ? ', answered' : ''}`}
-                className={`w-9 h-9 rounded-lg text-sm font-semibold border-2 transition-all ${
-                  active
-                    ? 'border-primary bg-primary text-primary-foreground shadow-md'
-                    : done
-                    ? 'border-green-400 dark:border-green-700 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                    : 'border-border bg-card text-muted-foreground hover:border-primary/50'
-                }`}
+                aria-label={`Question ${i + 1}${ans ? (ans.isCorrect ? ', correct' : ', incorrect') : ''}`}
+                className={`w-9 h-9 rounded-lg text-sm font-semibold border-2 transition-all ${styles}`}
               >
                 {i + 1}
               </button>

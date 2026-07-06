@@ -7,70 +7,70 @@
    ============================================ */
 
 @layer base {
-  /* Light Theme Colors */
+  /* Light Theme — warm neutral + terracotta */
   :root {
     /* Backgrounds */
-    --background: 248 250 252;        /* Main page background - slate-50 */
+    --background: 250 249 246;        /* Off-white paper */
     --card: 255 255 255;              /* Card/panel background - white */
-    
+
     /* Text Colors */
-    --foreground: 15 23 42;           /* Primary text - slate-900 */
-    --card-foreground: 15 23 42;      /* Text on cards - slate-900 */
-    --muted-foreground: 71 85 105;    /* Secondary text - slate-600 */
-    
+    --foreground: 26 26 26;           /* Ink */
+    --card-foreground: 26 26 26;      /* Text on cards - ink */
+    --muted-foreground: 107 101 96;   /* Secondary text - warm gray */
+
     /* Brand Colors */
-    --primary: 37 99 235;             /* Primary buttons/links - blue-600 */
+    --primary: 162 78 50;             /* Muted clay terracotta */
     --primary-foreground: 255 255 255; /* Text on primary - white */
-    
+
     /* UI Elements */
-    --secondary: 226 232 240;         /* Secondary surfaces - slate-200 */
-    --secondary-foreground: 15 23 42; /* Text on secondary - slate-900 */
-    --muted: 241 245 249;             /* Muted surfaces - slate-100 */
-    --accent: 241 245 249;            /* Accent surfaces - slate-100 */
-    --accent-foreground: 15 23 42;    /* Text on accent - slate-900 */
-    
+    --secondary: 237 234 228;         /* Secondary surfaces - warm stone */
+    --secondary-foreground: 26 26 26; /* Text on secondary - ink */
+    --muted: 240 237 231;             /* Muted surfaces - warm stone */
+    --accent: 240 237 231;            /* Accent surfaces - warm stone */
+    --accent-foreground: 26 26 26;    /* Text on accent - ink */
+
     /* Borders & Inputs */
-    --border: 203 213 225;            /* Border color - slate-300 */
-    --input: 226 232 240;             /* Input borders - slate-200 */
-    --ring: 37 99 235;                /* Focus ring - blue-600 */
-    
+    --border: 216 210 199;            /* Border color - warm */
+    --input: 216 210 199;             /* Input borders - warm */
+    --ring: 162 78 50;                /* Focus ring - terracotta */
+
     /* Status Colors */
-    --destructive: 220 38 38;         /* Error/danger - red-600 */
+    --destructive: 192 57 43;         /* Error/danger - warm red */
     --destructive-foreground: 255 255 255; /* Text on destructive - white */
-    
+
     /* Border Radius */
-    --radius: 0.5rem;                 /* Default border radius - 8px */
+    --radius: 0.25rem;                /* Default border radius - 4px */
   }
 
-  /* Dark Theme Colors */
+  /* Dark Theme — warm charcoal + terracotta */
   .dark {
     /* Backgrounds */
-    --background: 15 23 42;           /* Main page background - slate-900 */
-    --card: 30 41 59;                 /* Card/panel background - slate-800 */
-    
+    --background: 26 24 21;           /* Warm charcoal */
+    --card: 36 33 29;                 /* Card/panel background */
+
     /* Text Colors */
-    --foreground: 241 245 249;        /* Primary text - slate-100 */
-    --card-foreground: 241 245 249;   /* Text on cards - slate-100 */
-    --muted-foreground: 148 163 184;  /* Secondary text - slate-400 */
-    
+    --foreground: 237 234 228;        /* Warm off-white */
+    --card-foreground: 237 234 228;   /* Text on cards */
+    --muted-foreground: 163 156 147;  /* Secondary text - warm gray */
+
     /* Brand Colors */
-    --primary: 59 130 246;            /* Primary buttons/links - blue-500 */
+    --primary: 198 118 84;            /* Muted clay - lighter for dark */
     --primary-foreground: 255 255 255; /* Text on primary - white */
-    
+
     /* UI Elements */
-    --secondary: 51 65 85;            /* Secondary surfaces - slate-700 */
-    --secondary-foreground: 226 232 240; /* Text on secondary - slate-200 */
-    --muted: 51 65 85;                /* Muted surfaces - slate-700 */
-    --accent: 51 65 85;               /* Accent surfaces - slate-700 */
-    --accent-foreground: 226 232 240; /* Text on accent - slate-200 */
-    
+    --secondary: 51 47 41;            /* Secondary surfaces */
+    --secondary-foreground: 237 234 228; /* Text on secondary */
+    --muted: 46 42 37;               /* Muted surfaces */
+    --accent: 46 42 37;              /* Accent surfaces */
+    --accent-foreground: 237 234 228; /* Text on accent */
+
     /* Borders & Inputs */
-    --border: 71 85 105;              /* Border color - slate-600 */
-    --input: 51 65 85;                /* Input borders - slate-700 */
-    --ring: 59 130 246;               /* Focus ring - blue-500 */
-    
+    --border: 66 60 51;              /* Border color - warm */
+    --input: 51 47 41;              /* Input borders */
+    --ring: 198 118 84;             /* Focus ring - terracotta */
+
     /* Status Colors */
-    --destructive: 220 38 38;         /* Error/danger - red-600 */
+    --destructive: 212 80 63;        /* Error/danger - warm red */
     --destructive-foreground: 255 255 255; /* Text on destructive - white */
   }
 }
@@ -87,7 +87,7 @@
   
   /* Body Styles */
   body {
-    @apply bg-background text-foreground overflow-x-hidden;
+    @apply bg-background text-foreground overflow-x-hidden font-sans;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
@@ -106,13 +106,13 @@
   
   /* Dark mode select - explicit override */
   .dark select {
-    background-color: rgb(30 41 59);
-    color: rgb(241 245 249);
+    background-color: rgb(36 33 29);
+    color: rgb(237 234 228);
   }
-  
+
   .dark select option {
-    background-color: rgb(30 41 59);
-    color: rgb(241 245 249);
+    background-color: rgb(36 33 29);
+    color: rgb(237 234 228);
   }
 }
 

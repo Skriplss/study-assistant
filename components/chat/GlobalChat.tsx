@@ -125,7 +125,7 @@ export function GlobalChat() {
           id="chat-scope"
           value={scope}
           onChange={e => setScope(e.target.value)}
-          className="flex-1 max-w-xs px-3 py-1.5 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="flex-1 max-w-xs px-3 py-1.5 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
         >
           <option value="all">All materials</option>
           {materials.map(m => (
@@ -176,7 +176,7 @@ export function GlobalChat() {
                       <Link
                         key={src.id}
                         href={`/materials/${src.id}`}
-                        className="px-2 py-0.5 text-xs rounded-full bg-blue-500/10 text-blue-500 hover:underline max-w-[16rem] truncate"
+                        className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary hover:underline max-w-[16rem] truncate"
                         title={src.title}
                       >
                         {src.title}
@@ -209,7 +209,7 @@ export function GlobalChat() {
           onChange={e => setInput(e.target.value)}
           placeholder={scopeTitle ? `Ask about “${scopeTitle}”…` : 'Ask about your materials…'}
           disabled={loading}
-          className="flex-1 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
+          className="flex-1 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
         />
         <button
           type="submit"

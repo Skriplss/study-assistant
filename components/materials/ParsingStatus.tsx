@@ -20,7 +20,7 @@ export default function ParsingStatus({ material }: ParsingStatusProps) {
       icon: '⚙️',
       label: 'Processing',
       description: 'Extracting text content...',
-      className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+      className: 'bg-primary/10 text-primary',
     },
     completed: {
       icon: '✓',

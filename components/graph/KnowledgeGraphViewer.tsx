@@ -54,11 +54,11 @@ function cssVar(styles: CSSStyleDeclaration, name: string, fallback: string): st
 function readThemeColors(): ThemeColors {
   const s = getComputedStyle(document.documentElement)
   return {
-    bg: cssVar(s, '--background', '#0f172a'),
-    fg: cssVar(s, '--foreground', '#f1f5f9'),
-    muted: cssVar(s, '--muted-foreground', '#94a3b8'),
-    primary: cssVar(s, '--primary', '#3b82f6'),
-    border: cssVar(s, '--border', '#475569'),
+    bg: cssVar(s, '--background', '#1a1815'),
+    fg: cssVar(s, '--foreground', '#edeae4'),
+    muted: cssVar(s, '--muted-foreground', '#a39c93'),
+    primary: cssVar(s, '--primary', '#c67654'),
+    border: cssVar(s, '--border', '#423c33'),
   }
 }
 
@@ -75,11 +75,12 @@ const DEFAULTS = {
   showOrphans: true,
 }
 
+// Earthy, muted palette — distinct but in the same warm register as the theme.
 const CATEGORY_PALETTE = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+  '#B5563A', '#6E7F4E', '#C8923A', '#4E7E7A', '#8A5A7A',
+  '#A94D4A', '#5B7C99', '#7D6B4F', '#9A9440', '#6B5B95',
 ]
-const UNCATEGORIZED_COLOR = '#94a3b8'
+const UNCATEGORIZED_COLOR = '#A39C93'
 
 function Slider({
   label,
@@ -111,7 +112,7 @@ function Slider({
         step={step}
         value={value}
         onChange={e => onChange(parseFloat(e.target.value))}
-        className="w-full accent-blue-600 cursor-pointer"
+        className="w-full accent-primary cursor-pointer"
       />
     </label>
   )
@@ -379,7 +380,7 @@ export function KnowledgeGraphViewer() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Find a material…"
-                className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               />
               {searchIds && (
                 <p className="text-xs text-muted-foreground mt-1">
@@ -469,7 +470,7 @@ export function KnowledgeGraphViewer() {
                   ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
                   ctx.fillStyle = fill
                   ctx.shadowColor = fill
-                  ctx.shadowBlur = isHover ? 26 : isSearchHit ? 22 : active ? 12 : 0
+                  ctx.shadowBlur = isHover ? 16 : isSearchHit ? 12 : 0
                   ctx.fill()
                   ctx.restore()
 
@@ -507,7 +508,7 @@ export function KnowledgeGraphViewer() {
                     {tooltip.tags.map(tag => (
                       <span
                         key={tag}
-                        className="px-1.5 py-0.5 bg-blue-500/10 text-blue-500 rounded text-xs"
+                        className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs"
                       >
                         {tag}
                       </span>
@@ -516,7 +517,7 @@ export function KnowledgeGraphViewer() {
                 )}
                 <Link
                   href={`/materials/${tooltip.nodeId}`}
-                  className="text-xs font-medium text-blue-500 hover:underline inline-block"
+                  className="text-xs font-medium text-primary hover:underline inline-block"
                 >
                   Open material →
                 </Link>
@@ -593,7 +594,7 @@ export function KnowledgeGraphViewer() {
                     type="checkbox"
                     checked={showOrphans}
                     onChange={e => setShowOrphans(e.target.checked)}
-                    className="accent-blue-600 cursor-pointer"
+                    className="accent-primary cursor-pointer"
                   />
                   Show orphans
                 </label>

@@ -20,7 +20,7 @@ interface FeedbackRow {
 const TYPE_META: Record<FeedbackRow['type'], { label: string; className: string }> = {
   bug: { label: '🐞 Bug', className: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' },
   idea: { label: '💡 Idea', className: 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' },
-  other: { label: '💬 Other', className: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' },
+  other: { label: '💬 Other', className: 'bg-secondary text-secondary-foreground' },
 }
 
 const STATUSES: FeedbackRow['status'][] = ['new', 'seen', 'resolved']

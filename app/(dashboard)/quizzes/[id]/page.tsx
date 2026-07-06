@@ -104,7 +104,7 @@ export default function QuizPage() {
               quiz.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
               quiz.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
               quiz.difficulty === 'hard' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' :
-              'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+              'bg-secondary text-secondary-foreground'
             }`}>
               {quiz.difficulty.charAt(0).toUpperCase() + quiz.difficulty.slice(1)}
             </span>

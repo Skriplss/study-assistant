@@ -306,7 +306,7 @@ export default function MaterialUploader({
             <div className="flex items-center space-x-3 min-w-0 flex-1">
               <div className="flex-shrink-0">
                 <svg
-                  className="h-10 w-10 text-blue-500"
+                  className="h-10 w-10 text-primary"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
