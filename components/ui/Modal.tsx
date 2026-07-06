@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ModalProps {
   open: boolean
@@ -12,6 +13,11 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, widthClass = 'max-w-2xl' }: ModalProps) {
+  // Portal to <body> so the fixed overlay isn't trapped by an ancestor's
+  // containing block (e.g. a parent with transform / backdrop-filter).
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -27,9 +33,9 @@ export function Modal({ open, onClose, title, children, widthClass = 'max-w-2xl'
     }
   }, [open, onClose])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -56,6 +62,7 @@ export function Modal({ open, onClose, title, children, widthClass = 'max-w-2xl'
         </div>
         <div className="p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

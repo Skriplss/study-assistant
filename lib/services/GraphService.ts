@@ -2,9 +2,18 @@ import 'server-only'
 
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { AIService } from './AIService'
+import { prepareContent } from '@/lib/ai/quiz-prompt'
 import type { KnowledgeGraph, GraphNode, GraphEdge } from '@/lib/types'
 
 export class GraphService {
+  // Generic filler words that would otherwise create spurious concept matches.
+  private static readonly STOPWORDS = new Set([
+    'the', 'a', 'an', 'of', 'and', 'to', 'in', 'for', 'with', 'on', 'or', 'as',
+    'by', 'is', 'are', 'introduction', 'intro', 'basics', 'basic', 'overview',
+    'concept', 'concepts', 'fundamentals', 'fundamental', 'principle',
+    'principles', 'general', 'topic', 'topics', 'study', 'material', 'guide',
+  ])
+
   static async analyzeConnections(userId: string): Promise<void> {
     const db = getSupabaseAdmin()
     
@@ -33,9 +42,13 @@ export class GraphService {
     // Extract each material's concepts ONCE (n AI calls, bounded concurrency),
     // then compute pairwise overlap in code. The old approach ran one AI call
     // per pair — n(n-1)/2 sequential requests, which timed out at any scale.
+    // Sequential, not concurrent: Groq's free tier is ~6000 tokens/minute
+    // (shared across the whole org), so parallel extractions just trigger 429
+    // storms that burn the retry budget and return empty concept sets. One at a
+    // time lets the token bucket refill between calls.
     const withContent = materials.filter((m) => m.parsed_content)
     const conceptsById = new Map<string, string[]>()
-    await this.mapLimit(withContent, 4, async (m) => {
+    await this.mapLimit(withContent, 1, async (m) => {
       conceptsById.set(m.id, await this.extractConcepts(m.parsed_content as string, m.title))
     })
 
@@ -52,16 +65,21 @@ export class GraphService {
         const m1 = withContent[i]
         const m2 = withContent[j]
 
-        const c2 = new Set(conceptsById.get(m2.id) || [])
-        const sharedConcepts = (conceptsById.get(m1.id) || []).filter((c) => c2.has(c))
+        const sharedConcepts = this.sharedConcepts(
+          conceptsById.get(m1.id) || [],
+          conceptsById.get(m2.id) || []
+        )
         if (sharedConcepts.length === 0) continue
 
         const tags1 = tagsByMaterial.get(m1.id) || []
         const tags2 = tagsByMaterial.get(m2.id) || []
+        // material_connections enforces CHECK (material_id_1 < material_id_2),
+        // so the pair must be stored in id order — array order won't do.
+        const [id1, id2] = m1.id < m2.id ? [m1.id, m2.id] : [m2.id, m1.id]
         connections.push({
           user_id: userId,
-          material_id_1: m1.id,
-          material_id_2: m2.id,
+          material_id_1: id1,
+          material_id_2: id2,
           connection_strength: this.calculateStrength(sharedConcepts, tags1, tags2),
           shared_concepts: sharedConcepts,
         })
@@ -92,10 +110,12 @@ export class GraphService {
 
   /** Extract a normalized set of key concepts for one material (single AI call). */
   private static async extractConcepts(content: string, title: string): Promise<string[]> {
+    // Sample across the WHOLE material, not just the intro, so concepts reflect
+    // the full document.
     const prompt = `Extract the 8-12 most important concepts or topics from this study material as a JSON array of short lowercase strings. Title: ${title}
 
 Content:
-${content.substring(0, 3000)}
+${prepareContent(content, 6_000)}
 
 Return only a JSON array, e.g. ["concept a", "concept b"]`
 
@@ -105,7 +125,9 @@ Return only a JSON array, e.g. ["concept a", "concept b"]`
         maxTokens: 300,
       })
 
-      const parsed = JSON.parse((response || '[]').replace(/```json\n?|\n?```/g, ''))
+      // The model may wrap the array in prose — pull out the first JSON array.
+      const match = (response || '').match(/\[[\s\S]*\]/)
+      const parsed = JSON.parse(match ? match[0] : '[]')
       if (!Array.isArray(parsed)) return []
       return parsed
         .map((c) => String(c).toLowerCase().trim())
@@ -114,6 +136,44 @@ Return only a JSON array, e.g. ["concept a", "concept b"]`
     } catch {
       return []
     }
+  }
+
+  /** Significant, comparable tokens within one concept phrase. */
+  private static conceptTokens(concept: string): string[] {
+    return concept
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .split(' ')
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 3 && !this.STOPWORDS.has(t))
+  }
+
+  /**
+   * Concepts from two materials that overlap. Matches on an exact phrase OR a
+   * shared significant token, so "python programming" and "python basics" link
+   * via "python" instead of requiring identical strings.
+   */
+  private static sharedConcepts(a: string[], b: string[]): string[] {
+    const bPrepared = b.map((phrase) => ({
+      phrase,
+      norm: phrase.trim().toLowerCase(),
+      tokens: new Set(this.conceptTokens(phrase)),
+    }))
+
+    const shared = new Set<string>()
+    for (const p1 of a) {
+      const norm1 = p1.trim().toLowerCase()
+      const tokens1 = this.conceptTokens(p1)
+      for (const b2 of bPrepared) {
+        const match =
+          norm1 === b2.norm || tokens1.some((t) => b2.tokens.has(t))
+        if (match) {
+          // Prefer an exact match; otherwise keep the shorter, more general label.
+          shared.add(norm1 === b2.norm ? p1 : p1.length <= b2.phrase.length ? p1 : b2.phrase)
+        }
+      }
+    }
+    return [...shared]
   }
 
   private static calculateStrength(

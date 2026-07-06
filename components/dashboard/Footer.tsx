@@ -1,4 +1,5 @@
 import { SheepEasterEgg } from './SheepEasterEgg'
+import { FeedbackButton } from './FeedbackButton'
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
@@ -12,10 +13,14 @@ export function Footer() {
             <span className="hidden sm:inline text-muted-foreground/50">•</span>
             <p>Organize and engage with study materials using AI</p>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Built for</span>
-            <SheepEasterEgg />
+
+          <div className="flex items-center gap-4">
+            <FeedbackButton />
+            <span className="hidden sm:inline text-muted-foreground/50">•</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Built for</span>
+              <SheepEasterEgg />
+            </div>
           </div>
         </div>
       </div>

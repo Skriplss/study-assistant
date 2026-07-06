@@ -379,10 +379,27 @@ export class AIService {
   ): Promise<Omit<Quiz, 'id' | 'userId' | 'materialId' | 'createdAt'>> {
     const requested = config.questionCount
 
-    const first = await this.requestQuestions(content, config, materialTitle, language, requested)
-    let questions = first.questions
+    // Collapse to a normalized key so near-duplicates ("What is X?" vs
+    // "What is X ?") are treated as the same question.
+    const dupKey = (q: any) =>
+      (q.questionText || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 
-    // Top up once if validation left us short of what the user asked for.
+    const seen = new Set<string>()
+    const dedupe = (batch: any[]) => {
+      for (const q of batch) {
+        const key = dupKey(q)
+        if (key && !seen.has(key)) {
+          seen.add(key)
+          questions.push(q)
+        }
+      }
+    }
+
+    const first = await this.requestQuestions(content, config, materialTitle, language, requested)
+    let questions: any[] = []
+    dedupe(first.questions)
+
+    // Top up once if validation/dedup left us short of what the user asked for.
     if (questions.length < requested) {
       const missing = requested - questions.length
       try {
@@ -393,14 +410,7 @@ export class AIService {
           language,
           missing
         )
-        const seen = new Set(questions.map((q) => q.questionText.trim().toLowerCase()))
-        for (const q of extra.questions) {
-          const key = q.questionText.trim().toLowerCase()
-          if (!seen.has(key)) {
-            seen.add(key)
-            questions.push(q)
-          }
-        }
+        dedupe(extra.questions)
       } catch (error) {
         console.log('Quiz top-up failed, using partial set:', (error as Error)?.message)
       }
@@ -438,13 +448,23 @@ export class AIService {
 
     // Multiple choice — deterministic, no AI call needed.
     if (question.questionType === 'multiple_choice') {
-      const isCorrect =
-        userAnswer.trim().toLowerCase() === correctAnswer?.trim().toLowerCase()
+      const norm = (s?: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
+      const isCorrect = norm(userAnswer) === norm(correctAnswer)
       return {
         isCorrect,
         feedback: isCorrect
           ? question.explanation || 'Correct!'
           : `Incorrect. The correct answer is: ${correctAnswer}. ${question.explanation || ''}`,
+        correctAnswer,
+      }
+    }
+
+    // Reject empty / non-substantive answers deterministically — the model is
+    // too lenient and will accept "..." or gibberish as a paraphrase.
+    if (userAnswer.replace(/[^\p{L}\p{N}]/gu, '').length === 0) {
+      return {
+        isCorrect: false,
+        feedback: `Incorrect. The expected answer is: ${correctAnswer}`,
         correctAnswer,
       }
     }
@@ -461,11 +481,24 @@ export class AIService {
       maxTokens: 500,
     })
 
-    const parsed = this.extractJson(raw)
-    return {
-      isCorrect: parsed.isCorrect,
-      feedback: parsed.feedback,
-      correctAnswer,
+    try {
+      const parsed = this.extractJson(raw)
+      return {
+        isCorrect: !!parsed.isCorrect,
+        feedback:
+          parsed.feedback ||
+          (parsed.isCorrect
+            ? 'Correct!'
+            : `Incorrect. The expected answer is: ${correctAnswer}`),
+        correctAnswer,
+      }
+    } catch {
+      // Model returned unparseable output — fail closed instead of throwing.
+      return {
+        isCorrect: false,
+        feedback: `Could not verify the answer automatically. The expected answer is: ${correctAnswer}`,
+        correctAnswer,
+      }
     }
   }
 

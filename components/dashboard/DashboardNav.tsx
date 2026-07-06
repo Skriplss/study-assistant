@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { signOut } from '@/lib/auth/session'
+import { signOut, useAuth } from '@/lib/auth/session'
+import { isAdmin } from '@/lib/config/admin'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { cn } from '@/lib/utils/cn'
 
@@ -17,7 +18,12 @@ const NAV_ITEMS = [
 export default function DashboardNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const { user } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
+
+  const navItems = isAdmin(user?.email)
+    ? [...NAV_ITEMS, { href: '/feedback', label: 'Feedback' }]
+    : NAV_ITEMS
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -46,7 +52,7 @@ export default function DashboardNav() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex gap-1">
-          {NAV_ITEMS.map(item => (
+          {navItems.map(item => (
             <Link key={item.href} href={item.href} className={linkClass(item.href)}>
               {item.label}
             </Link>
@@ -85,7 +91,7 @@ export default function DashboardNav() {
       {/* Mobile dropdown */}
       {menuOpen && (
         <nav className="md:hidden border-t border-border px-4 py-3 flex flex-col gap-1">
-          {NAV_ITEMS.map(item => (
+          {navItems.map(item => (
             <Link
               key={item.href}
               href={item.href}

@@ -45,6 +45,7 @@ export interface Quiz {
   status: 'draft' | 'in_progress' | 'completed'
   score: number | null
   questions: Question[]
+  answers?: Answer[]
   completedAt: string | null
   createdAt: string
 }

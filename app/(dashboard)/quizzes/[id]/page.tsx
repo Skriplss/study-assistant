@@ -53,6 +53,17 @@ export default function QuizPage() {
     loadQuiz()
   }
 
+  const handleRetake = async () => {
+    if (!session) return
+    const res = await fetchWithAuth(session, `/api/quizzes/${quizId}/retake`, {
+      method: 'POST',
+    })
+    if (res.ok) {
+      setResults(null)
+      await loadQuiz()
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -113,6 +124,7 @@ export default function QuizPage() {
             results={results}
             questions={quiz.questions}
             onBack={() => router.push('/materials')}
+            onRetake={handleRetake}
           />
         ) : (
           <QuizTaker quiz={quiz} onComplete={handleComplete} />

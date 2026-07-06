@@ -19,7 +19,7 @@ export async function POST(
     }
 
     const { id } = await params
-    const results = await QuizService.completeQuiz(id)
+    const results = await QuizService.completeQuiz(user.id, id)
 
     return NextResponse.json({ results }, { status: 200 })
   } catch (error: any) {

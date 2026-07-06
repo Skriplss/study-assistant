@@ -4,6 +4,11 @@ import { getLanguageName } from './language-detection'
 const MAX_CONTENT_CHARS = 16_000
 const SAMPLE_SEGMENTS = 6
 
+// Quiz generation runs on large-context models (Gemini 1M, Groq llama-4-scout
+// ~128k), so we can feed the whole material instead of a 16k sample. Most study
+// docs fit under this and are passed in full; only truly huge docs get sampled.
+const QUIZ_MAX_CONTENT_CHARS = 100_000
+
 export function truncateContent(content: string): string {
   if (content.length <= MAX_CONTENT_CHARS) return content
   return `${content.slice(0, MAX_CONTENT_CHARS)}\n\n[Content truncated]`
@@ -52,14 +57,21 @@ Title: ${materialTitle ?? 'Untitled'}
 Difficulty: ${config.difficulty}
 Types: ${types}${languageInstruction}
 
-AVOID: authors, dates, publishers, metadata, trivial facts
-FOCUS: concepts, processes, analysis, applications, key facts from content
+AVOID: authors, dates, publishers, metadata, obscure trivia
+FOCUS: concepts, processes, cause/effect, analysis, applications, key facts
+
+APPROACH:
+- First outline the DISTINCT topics/sections covered across the whole material.
+- Distribute the ${config.questionCount} questions as evenly as possible across those distinct topics.
+- One question = one concept. Favor breadth of coverage over piling multiple questions onto the same narrow point.
+- Prefer questions a real exam would ask to check genuine understanding, while staying answerable strictly from the material.
 
 RULES:
 - Return valid JSON only (no markdown)
 - Generate EXACTLY ${config.questionCount} questions, no fewer
-- Spread questions across the WHOLE material, not just the beginning
-- No duplicate or near-duplicate questions
+- Each question has a short "topic" label naming the section/concept it comes from
+- No two questions may test the same fact or be near-duplicates
+- Spread questions across the WHOLE material (beginning, middle, and end)
 - Multiple choice: exactly 4 unique options, correctAnswer matches one exactly
 - Open-ended: options=null, correctAnswer is 1-3 sentence model answer
 - Questions must be clear, test understanding, answerable from material
@@ -72,6 +84,7 @@ JSON format:
       "questionText": "string",
       "questionType": "multiple_choice"|"open_ended",
       "difficulty": "easy"|"medium"|"hard",
+      "topic": "string",
       "options": ["a","b","c","d"]|null,
       "correctAnswer": "string",
       "explanation": "string",
@@ -81,7 +94,7 @@ JSON format:
 }
 
 Material:
-${prepareContent(content)}`
+${prepareContent(content, QUIZ_MAX_CONTENT_CHARS)}`
 }
 
 export function buildAnswerVerificationPrompt(
@@ -101,5 +114,5 @@ Return JSON only:
 {"isCorrect": bool, "feedback": "string"}
 
 Multiple choice: exact match (case-insensitive)
-Open-ended: semantic match (accept paraphrases)`
+Open-ended: semantic match — accept correct paraphrases, but mark INCORRECT if the student answer is empty, gibberish, off-topic, or does not actually answer the question.`
 }

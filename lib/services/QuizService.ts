@@ -72,11 +72,11 @@ export class QuizService {
 
     if (error || !quiz) throw new Error('Quiz not found')
 
-    const { data: questions } = await db
-      .from('questions')
-      .select('*')
-      .eq('quiz_id', quizId)
-      .order('order_index')
+    // Questions and any existing answers are independent reads — run together.
+    const [{ data: questions }, { data: answers }] = await Promise.all([
+      db.from('questions').select('*').eq('quiz_id', quizId).order('order_index'),
+      db.from('answers').select('*').eq('quiz_id', quizId),
+    ])
 
     return {
       id: quiz.id,
@@ -98,27 +98,35 @@ export class QuizService {
         explanation: q.explanation,
         orderIndex: q.order_index,
       })),
+      answers: (answers || []).map(a => ({
+        id: a.id,
+        quizId: a.quiz_id,
+        questionId: a.question_id,
+        userAnswer: a.user_answer,
+        isCorrect: a.is_correct,
+        feedback: a.feedback,
+        answeredAt: a.answered_at || new Date().toISOString(),
+      })),
       completedAt: quiz.completed_at,
       createdAt: quiz.created_at || new Date().toISOString(),
     }
   }
 
   static async submitAnswer(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     userId: string,
     quizId: string,
     questionId: string,
     userAnswer: string
   ): Promise<Answer> {
     const db = getSupabaseAdmin()
-    
-    const { data: question } = await db
-      .from('questions')
-      .select('*')
-      .eq('id', questionId)
-      .single()
 
-    if (!question) throw new Error('Question not found')
+    const [{ data: quiz }, { data: question }] = await Promise.all([
+      db.from('quizzes').select('user_id, status').eq('id', quizId).single(),
+      db.from('questions').select('*').eq('id', questionId).single(),
+    ])
+
+    if (!quiz || quiz.user_id !== userId) throw new Error('Quiz not found')
+    if (!question || question.quiz_id !== quizId) throw new Error('Question not found')
 
     const questionFormatted = {
       id: question.id,
@@ -143,7 +151,15 @@ export class QuizService {
       feedback: verification.feedback,
     }
 
-    await db.from('answers').insert(answer)
+    const { error: saveError } = await db
+      .from('answers')
+      .upsert(answer, { onConflict: 'quiz_id,question_id' })
+    if (saveError) throw new Error(`Failed to save answer: ${saveError.message}`)
+
+    // First answer moves the quiz out of the draft state.
+    if (quiz.status === 'draft') {
+      await db.from('quizzes').update({ status: 'in_progress' }).eq('id', quizId)
+    }
 
     return {
       id: answer.id,
@@ -156,9 +172,9 @@ export class QuizService {
     }
   }
 
-  static async completeQuiz(quizId: string): Promise<QuizResults> {
+  static async completeQuiz(userId: string, quizId: string): Promise<QuizResults> {
     const db = getSupabaseAdmin()
-    
+
     // Independent reads — run concurrently.
     const [{ data: answers }, { data: quiz }] = await Promise.all([
       db.from('answers').select('*').eq('quiz_id', quizId),
@@ -170,6 +186,13 @@ export class QuizService {
     ])
 
     if (!quiz || !answers) throw new Error('Quiz not found')
+    if (quiz.user_id !== userId) throw new Error('Quiz not found')
+
+    // Every question must be answered before the quiz can be scored.
+    const answeredCount = new Set(answers.map((a) => a.question_id)).size
+    if (answeredCount < quiz.total_questions) {
+      throw new Error('All questions must be answered before finishing the quiz')
+    }
 
     const correctCount = answers.filter((a) => a.is_correct).length
     const score = (correctCount / quiz.total_questions) * 100
@@ -206,5 +229,56 @@ export class QuizService {
       })),
       completedAt: new Date().toISOString(),
     }
+  }
+
+  static async getResults(userId: string, quizId: string): Promise<QuizResults> {
+    const db = getSupabaseAdmin()
+
+    const [{ data: quiz }, { data: answers }] = await Promise.all([
+      db.from('quizzes').select('*').eq('id', quizId).single(),
+      db.from('answers').select('*').eq('quiz_id', quizId).order('answered_at'),
+    ])
+
+    if (!quiz || quiz.user_id !== userId) throw new Error('Quiz not found')
+
+    const rows = answers || []
+    return {
+      quizId: quiz.id,
+      score: quiz.score ?? 0,
+      correctCount: rows.filter((a) => a.is_correct).length,
+      totalQuestions: quiz.total_questions,
+      answers: rows.map((a) => ({
+        id: a.id,
+        quizId: a.quiz_id,
+        questionId: a.question_id,
+        userAnswer: a.user_answer,
+        isCorrect: a.is_correct,
+        feedback: a.feedback,
+        answeredAt: a.answered_at || new Date().toISOString(),
+      })),
+      completedAt: quiz.completed_at || new Date().toISOString(),
+    }
+  }
+
+  static async retakeQuiz(userId: string, quizId: string): Promise<Quiz> {
+    const db = getSupabaseAdmin()
+
+    const { data: quiz } = await db
+      .from('quizzes')
+      .select('user_id')
+      .eq('id', quizId)
+      .single()
+
+    if (!quiz || quiz.user_id !== userId) throw new Error('Quiz not found')
+
+    // Clear prior attempt and reopen the quiz.
+    await db.from('answers').delete().eq('quiz_id', quizId)
+    const { error } = await db
+      .from('quizzes')
+      .update({ status: 'in_progress', score: null, completed_at: null })
+      .eq('id', quizId)
+    if (error) throw new Error(error.message)
+
+    return this.getQuiz(quizId)
   }
 }

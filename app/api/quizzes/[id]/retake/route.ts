@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { QuizService } from '@/lib/services/QuizService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 
-export async function GET(
+export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -20,11 +20,11 @@ export async function GET(
     }
 
     const { id } = await params
-    const results = await QuizService.getResults(user.id, id)
+    const quiz = await QuizService.retakeQuiz(user.id, id)
 
-    return NextResponse.json(results, { status: 200 })
+    return NextResponse.json({ quiz }, { status: 200 })
   } catch (error: any) {
-    console.error('Get results error:', error)
-    return NextResponse.json({ error: error.message }, { status: 404 })
+    console.error('Retake quiz error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

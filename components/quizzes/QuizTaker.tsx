@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import { LatexRenderer, hasLatex } from '@/components/ui/LatexRenderer'
@@ -16,8 +16,13 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
   const { session } = useAuth()
   const { toast } = useToast()
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [answers, setAnswers] = useState<Map<string, Answer>>(new Map())
-  const [userAnswer, setUserAnswer] = useState('')
+  // Hydrate from answers already saved server-side so a reload mid-quiz keeps progress.
+  const [answers, setAnswers] = useState<Map<string, Answer>>(
+    () => new Map((quiz.answers ?? []).map((a) => [a.questionId, a]))
+  )
+  const [userAnswer, setUserAnswer] = useState(
+    () => (quiz.answers ?? []).find((a) => a.questionId === quiz.questions[0]?.id)?.userAnswer ?? ''
+  )
   const [submitting, setSubmitting] = useState(false)
 
   const currentQuestion = quiz.questions[currentIndex]
@@ -59,21 +64,27 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
     }
   }
 
-  const handleNext = () => {
-    if (currentIndex < quiz.questions.length - 1) {
-      setCurrentIndex(currentIndex + 1)
-      const nextAnswer = answers.get(quiz.questions[currentIndex + 1].id)
-      setUserAnswer(nextAnswer?.userAnswer || '')
-    }
+  const goTo = (index: number) => {
+    if (index < 0 || index > quiz.questions.length - 1) return
+    setCurrentIndex(index)
+    setUserAnswer(answers.get(quiz.questions[index].id)?.userAnswer || '')
   }
 
-  const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1)
-      const prevAnswer = answers.get(quiz.questions[currentIndex - 1].id)
-      setUserAnswer(prevAnswer?.userAnswer || '')
+  const handleNext = () => goTo(currentIndex + 1)
+  const handlePrevious = () => goTo(currentIndex - 1)
+
+  // Arrow keys jump between questions, but not while typing an answer.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return
+      if (e.key === 'ArrowLeft') goTo(currentIndex - 1)
+      if (e.key === 'ArrowRight') goTo(currentIndex + 1)
     }
-  }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, answers])
 
   const handleFinish = async () => {
     if (!session) return
@@ -104,6 +115,29 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
             className="bg-primary h-3 rounded-full transition-all duration-500 ease-out shadow-lg"
             style={{ width: `${progress}%` }}
           />
+        </div>
+
+        <div className="flex flex-wrap gap-2 mt-4">
+          {quiz.questions.map((q, i) => {
+            const done = answers.has(q.id)
+            const active = i === currentIndex
+            return (
+              <button
+                key={q.id}
+                onClick={() => goTo(i)}
+                aria-label={`Question ${i + 1}${done ? ', answered' : ''}`}
+                className={`w-9 h-9 rounded-lg text-sm font-semibold border-2 transition-all ${
+                  active
+                    ? 'border-primary bg-primary text-primary-foreground shadow-md'
+                    : done
+                    ? 'border-green-400 dark:border-green-700 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                    : 'border-border bg-card text-muted-foreground hover:border-primary/50'
+                }`}
+              >
+                {i + 1}
+              </button>
+            )
+          })}
         </div>
       </div>
 
