@@ -4,7 +4,7 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
-        <div className="bg-card p-8 rounded-lg shadow-md">
+        <div className="bg-card p-8 rounded-lg border border-border">
           <ResetPasswordForm />
         </div>
       </div>

@@ -29,6 +29,25 @@ const publicRoutes = [
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Root is just an entry point — no marketing splash. Send people straight to
+  // where they belong: the app if signed in, the login screen otherwise.
+  if (pathname === '/') {
+    const accessToken = request.cookies.get('sb-access-token')?.value
+    const refreshToken = request.cookies.get('sb-refresh-token')?.value
+    let authed = false
+    if (accessToken) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } }
+      )
+      const { data } = await supabase.auth.getUser(accessToken)
+      authed = !!data.user
+    }
+    if (!authed && refreshToken) authed = true
+    return NextResponse.redirect(new URL(authed ? '/dashboard' : '/auth/login', request.url))
+  }
+
   // Check if the route is protected
   const isProtectedRoute = protectedRoutes.some((route) =>
     pathname.startsWith(route)

@@ -164,6 +164,14 @@ export function KnowledgeGraphViewer() {
     return () => obs.disconnect()
   }, [])
 
+  // Repaint when the theme changes. The render loop pauses once the simulation
+  // cools, so node/link colors (and the canvas background) would otherwise stay
+  // stale until the next hover/drag — resumeAnimation redraws without reheating
+  // the physics, so nothing moves.
+  useEffect(() => {
+    fgRef.current?.resumeAnimation()
+  }, [colors])
+
   // Track container width for a responsive canvas.
   useEffect(() => {
     const el = containerRef.current
@@ -265,9 +273,12 @@ export function KnowledgeGraphViewer() {
     return { categoryColors: map, hasUncategorized }
   }, [graph])
 
+  // Uncategorized nodes follow the theme's muted-foreground so they stay
+  // visible in both light and dark (the static gray blends into off-white).
+  const uncategorizedColor = colors?.muted ?? UNCATEGORIZED_COLOR
   const nodeColor = useCallback(
-    (category: string | null) => (category && categoryColors.get(category)) || UNCATEGORIZED_COLOR,
-    [categoryColors]
+    (category: string | null) => (category && categoryColors.get(category)) || uncategorizedColor,
+    [categoryColors, uncategorizedColor]
   )
 
   // Node ids matching the search query (null when the box is empty).
@@ -406,7 +417,7 @@ export function KnowledgeGraphViewer() {
                     <li className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span
                         className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: UNCATEGORIZED_COLOR }}
+                        style={{ backgroundColor: uncategorizedColor }}
                       />
                       <span className="truncate">Uncategorized</span>
                     </li>
