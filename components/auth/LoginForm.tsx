@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 
 export default function LoginForm() {
   const router = useRouter()
@@ -96,6 +97,8 @@ export default function LoginForm() {
       >
         {isLoading ? 'Logging in...' : 'Login'}
       </button>
+
+      <GoogleSignInButton />
 
       <div className="text-center text-sm">
         <a

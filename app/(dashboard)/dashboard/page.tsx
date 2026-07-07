@@ -28,22 +28,22 @@ export default function DashboardPage() {
         </p>
       </div>
       
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <Link
           href="/materials"
-          className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-semibold shadow-md transition-all"
+          className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-semibold shadow-md transition-all text-center"
         >
           View materials
         </Link>
         <Link
           href="/materials/upload"
-          className="px-5 py-2.5 border-2 border-border bg-card text-foreground rounded-lg hover:bg-accent text-sm font-medium transition-all"
+          className="px-5 py-2.5 border-2 border-border bg-card text-foreground rounded-lg hover:bg-accent text-sm font-medium transition-all text-center"
         >
           Upload new file
         </Link>
         <Link
           href="/graph"
-          className="px-5 py-2.5 border-2 border-border bg-card text-foreground rounded-lg hover:bg-accent text-sm font-medium transition-all"
+          className="px-5 py-2.5 border-2 border-border bg-card text-foreground rounded-lg hover:bg-accent text-sm font-medium transition-all text-center"
         >
           Knowledge Graph
         </Link>

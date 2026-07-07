@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import {
   validatePassword,
   getPasswordStrength,
@@ -192,6 +193,8 @@ export default function SignupForm() {
       >
         {isLoading ? 'Creating account...' : 'Sign Up'}
       </button>
+
+      <GoogleSignInButton />
 
       <div className="text-center text-sm text-muted-foreground">
         Already have an account?{' '}
