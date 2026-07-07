@@ -74,6 +74,36 @@ function linkEndId(end: string | FGNode): string {
   return typeof end === 'object' ? end.id : end
 }
 
+// Force software rasterization for force-graph's canvas. Some GPU-accelerated
+// 2D-canvas pipelines (Chrome ANGLE-GL on Linux/AMD, iOS Safari) composite the
+// accelerated texture through a broken color transform, so the graph displays
+// washed-out/inverted even though the bitmap itself is correct (getImageData
+// returns the right pixels). willReadFrequently keeps the bitmap on the CPU,
+// which sidesteps the bug; force-graph offers no hook for context attributes,
+// so wrap getContext for attribute-less 2d requests.
+if (typeof HTMLCanvasElement !== 'undefined') {
+  const proto = HTMLCanvasElement.prototype as HTMLCanvasElement & {
+    getContext: typeof HTMLCanvasElement.prototype.getContext & {
+      __softwareRaster2d?: boolean
+    }
+  }
+  if (!proto.getContext.__softwareRaster2d) {
+    const orig = proto.getContext
+    const patched = function (
+      this: HTMLCanvasElement,
+      type: string,
+      attrs?: unknown
+    ) {
+      if (type === '2d' && attrs === undefined) {
+        attrs = { willReadFrequently: true }
+      }
+      return orig.call(this, type as '2d', attrs)
+    } as typeof proto.getContext
+    patched.__softwareRaster2d = true
+    proto.getContext = patched
+  }
+}
+
 const DEFAULTS = {
   repel: -160,
   linkDistance: 60,
@@ -459,6 +489,19 @@ export function KnowledgeGraphViewer() {
                   height={height}
                   backgroundColor={colors.bg}
                   cooldownTicks={120}
+                  onRenderFramePre={(ctx: CanvasRenderingContext2D) => {
+                    // Paint the background into the bitmap so the canvas layer is
+                    // opaque. force-graph's default (transparent bitmap + CSS
+                    // background) gets color-inverted by some GPU compositors
+                    // (Chrome ANGLE-GL on Linux/AMD, iOS Safari) — nodes render
+                    // washed-out white on the light theme. An opaque layer takes
+                    // the direct copy path and displays true.
+                    ctx.save()
+                    ctx.setTransform(1, 0, 0, 1, 0, 0)
+                    ctx.fillStyle = colors.bg
+                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+                    ctx.restore()
+                  }}
                   onEngineStop={() => {
                     if (!didFitRef.current) {
                       fgRef.current?.zoomToFit(400, 60)
