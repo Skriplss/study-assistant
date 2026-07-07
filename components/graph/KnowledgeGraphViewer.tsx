@@ -51,14 +51,22 @@ function cssVar(styles: CSSStyleDeclaration, name: string, fallback: string): st
   return raw ? `rgb(${raw.split(/\s+/).join(', ')})` : fallback
 }
 
+// Overlay an alpha on an `rgb(r, g, b)` string produced by cssVar.
+function withAlpha(rgb: string, alpha: number): string {
+  return rgb.replace(/^rgb\(/, 'rgba(').replace(/\)$/, `, ${alpha})`)
+}
+
 function readThemeColors(): ThemeColors {
   const s = getComputedStyle(document.documentElement)
+  // Fallbacks are light-theme values: if a var ever reads empty we'd rather
+  // render dark ink on off-white (visible) than the dark theme's near-white
+  // fg, which would vanish on a light page.
   return {
-    bg: cssVar(s, '--background', '#1a1815'),
-    fg: cssVar(s, '--foreground', '#edeae4'),
-    muted: cssVar(s, '--muted-foreground', '#a39c93'),
-    primary: cssVar(s, '--primary', '#c67654'),
-    border: cssVar(s, '--border', '#423c33'),
+    bg: cssVar(s, '--background', '#faf9f6'),
+    fg: cssVar(s, '--foreground', '#1a1a1a'),
+    muted: cssVar(s, '--muted-foreground', '#6b6560'),
+    primary: cssVar(s, '--primary', '#a24e32'),
+    border: cssVar(s, '--border', '#d8d2c7'),
   }
 }
 
@@ -76,11 +84,15 @@ const DEFAULTS = {
 }
 
 // Earthy, muted palette — distinct but in the same warm register as the theme.
+// Tuned to sit on the dark charcoal canvas.
 const CATEGORY_PALETTE = [
   '#B5563A', '#6E7F4E', '#C8923A', '#4E7E7A', '#8A5A7A',
   '#A94D4A', '#5B7C99', '#7D6B4F', '#9A9440', '#6B5B95',
 ]
 const UNCATEGORIZED_COLOR = '#A39C93'
+// On the light (milky-white) canvas we drop the palette and render every node
+// in the dark theme's background charcoal — dark dots on milky white.
+const LIGHT_NODE_COLOR = '#1a1815'
 
 function Slider({
   label,
@@ -262,6 +274,14 @@ export function KnowledgeGraphViewer() {
     return set
   }, [hoverId, neighbors])
 
+  // Light canvas → monochrome charcoal nodes instead of the palette. Read the
+  // theme straight from the <html> class (the MutationObserver refreshes
+  // `colors` on toggle, so keying the memo on it re-evaluates in sync).
+  const isLight = useMemo(() => {
+    if (typeof document === 'undefined') return true
+    return !document.documentElement.classList.contains('dark')
+  }, [colors])
+
   // Stable color per category + whether any node is uncategorized (for legend).
   const { categoryColors, hasUncategorized } = useMemo(() => {
     const cats = Array.from(
@@ -277,8 +297,11 @@ export function KnowledgeGraphViewer() {
   // visible in both light and dark (the static gray blends into off-white).
   const uncategorizedColor = colors?.muted ?? UNCATEGORIZED_COLOR
   const nodeColor = useCallback(
-    (category: string | null) => (category && categoryColors.get(category)) || uncategorizedColor,
-    [categoryColors, uncategorizedColor]
+    (category: string | null) =>
+      isLight
+        ? LIGHT_NODE_COLOR
+        : (category && categoryColors.get(category)) || uncategorizedColor,
+    [isLight, categoryColors, uncategorizedColor]
   )
 
   // Node ids matching the search query (null when the box is empty).
@@ -358,268 +381,280 @@ export function KnowledgeGraphViewer() {
         </div>
       ) : (
         <>
-        {/* Mobile panel toggles */}
-        <div className="flex gap-2 mb-3 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setLeftOpen((o) => !o)}
-            aria-expanded={leftOpen}
-            className="flex-1 text-xs px-3 py-2 border border-border rounded hover:bg-muted text-foreground transition-colors"
-          >
-            Search &amp; Legend {leftOpen ? '▲' : '▼'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setRightOpen((o) => !o)}
-            aria-expanded={rightOpen}
-            className="flex-1 text-xs px-3 py-2 border border-border rounded hover:bg-muted text-foreground transition-colors"
-          >
-            Controls {rightOpen ? '▲' : '▼'}
-          </button>
-        </div>
+          {/* Mobile panel toggles */}
+          <div className="flex gap-2 mb-3 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setLeftOpen((o) => !o)}
+              aria-expanded={leftOpen}
+              className="flex-1 text-xs px-3 py-2 border border-border rounded hover:bg-muted text-foreground transition-colors"
+            >
+              Search &amp; Legend {leftOpen ? '▲' : '▼'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRightOpen((o) => !o)}
+              aria-expanded={rightOpen}
+              className="flex-1 text-xs px-3 py-2 border border-border rounded hover:bg-muted text-foreground transition-colors"
+            >
+              Controls {rightOpen ? '▲' : '▼'}
+            </button>
+          </div>
 
-        <div className="flex flex-col lg:flex-row border border-border rounded-lg overflow-hidden lg:min-h-[520px] lg:h-[min(80vh,860px)]">
-          <aside
-            className={cn(
-              'w-full lg:w-56 shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-card overflow-y-auto p-4 space-y-5',
-              leftOpen ? 'block' : 'hidden lg:block'
-            )}
-          >
-            <div>
-              <h4 className="font-semibold text-foreground text-sm mb-2">Search</h4>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Find a material…"
-                className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              {searchIds && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {searchIds.size} match{searchIds.size === 1 ? '' : 'es'}
-                </p>
+          <div className="flex flex-col lg:flex-row border border-border rounded-lg overflow-hidden lg:min-h-[520px] lg:h-[min(80vh,860px)]">
+            <aside
+              className={cn(
+                'w-full lg:w-56 shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-card overflow-y-auto p-4 space-y-5',
+                leftOpen ? 'block' : 'hidden lg:block'
+              )}
+            >
+              <div>
+                <h4 className="font-semibold text-foreground text-sm mb-2">Search</h4>
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Find a material…"
+                  className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                {searchIds && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {searchIds.size} match{searchIds.size === 1 ? '' : 'es'}
+                  </p>
+                )}
+              </div>
+
+              {(categoryColors.size > 0 || hasUncategorized) && (
+                <div>
+                  <h4 className="font-semibold text-foreground text-sm mb-3">Categories</h4>
+                  <ul className="space-y-1.5">
+                    {[...categoryColors].map(([cat]) => (
+                      <li key={cat} className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: nodeColor(cat) }}
+                        />
+                        <span className="truncate">{cat}</span>
+                      </li>
+                    ))}
+                    {hasUncategorized && (
+                      <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: nodeColor(null) }}
+                        />
+                        <span className="truncate">Uncategorized</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </aside>
+
+            <div ref={containerRef} className="relative flex-1 min-w-0 h-[55vh] lg:h-auto">
+              {colors && (
+                <ForceGraph2D
+                  ref={fgRef as never}
+                  graphData={graphData}
+                  width={width}
+                  height={height}
+                  backgroundColor={colors.bg}
+                  cooldownTicks={120}
+                  onEngineStop={() => {
+                    if (!didFitRef.current) {
+                      fgRef.current?.zoomToFit(400, 60)
+                      didFitRef.current = true
+                    }
+                  }}
+                  onNodeHover={(node: FGNode | null) => setHoverId(node?.id ?? null)}
+                  onNodeClick={(node: FGNode) => handleNodeClick(node)}
+                  onBackgroundClick={() => setTooltip(null)}
+                  nodeVisibility={(node: FGNode) => showOrphans || node.degree > 0}
+                  linkVisibility={(l: FGLink) => l.strength >= minStrength}
+                  linkColor={(l: FGLink) =>
+                    hoverId &&
+                      (linkEndId(l.source) === hoverId || linkEndId(l.target) === hoverId)
+                      ? colors.primary
+                      : withAlpha(colors.muted, 0.4)
+                  }
+                  linkWidth={(l: FGLink) => {
+                    const active =
+                      hoverId &&
+                      (linkEndId(l.source) === hoverId || linkEndId(l.target) === hoverId)
+                    return Math.max(1, l.strength * 4) * (active ? 1.8 : 1)
+                  }}
+                  nodeRelSize={1}
+                  nodePointerAreaPaint={(node: FGNode, color: string, ctx: CanvasRenderingContext2D) => {
+                    ctx.fillStyle = color
+                    ctx.beginPath()
+                    ctx.arc(node.x!, node.y!, node.r * nodeScale + 3, 0, 2 * Math.PI)
+                    ctx.fill()
+                  }}
+                  nodeCanvasObject={(node: FGNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
+                    const matchesHover = !highlightNodes || highlightNodes.has(node.id)
+                    const matchesSearch = !searchIds || searchIds.has(node.id)
+                    const active = matchesHover && matchesSearch
+                    const isHover = node.id === hoverId
+                    const isSearchHit = searchIds?.has(node.id) ?? false
+                    const r = node.r * nodeScale
+                    const fill = nodeColor(node.category)
+
+                    ctx.save()
+                    ctx.globalAlpha = active ? 1 : 0.12
+                    ctx.beginPath()
+                    ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
+                    ctx.fillStyle = fill
+                    ctx.fill()
+                    // Emphasis ring on hover / search hit — no canvas shadow: with
+                    // force-graph's transparent canvas + CSS background, a shadowed
+                    // dark fill composites toward the bg and reads as near-white.
+                    if (isHover || isSearchHit) {
+                      ctx.lineWidth = Math.max(1.5 / globalScale, 0.75)
+                      ctx.strokeStyle = colors.primary
+                      ctx.stroke()
+                    }
+                    ctx.restore()
+
+                    const showLabel =
+                      isHover ||
+                      isSearchHit ||
+                      globalScale > labelThreshold ||
+                      (highlightNodes?.has(node.id) ?? false)
+                    if (showLabel) {
+                      const fontSize = Math.max(11 / globalScale, 2)
+                      ctx.font = `${fontSize}px Inter, system-ui, sans-serif`
+                      ctx.textAlign = 'center'
+                      ctx.textBaseline = 'top'
+                      ctx.globalAlpha = active ? 1 : 0.2
+                      const label = node.label.length > 28 ? node.label.slice(0, 27) + '…' : node.label
+                      // Halo in the background color so the ink label stays legible
+                      // over nodes, edges, and the canvas on both themes.
+                      ctx.lineWidth = Math.max(2 / globalScale, 0.5)
+                      ctx.strokeStyle = colors.bg
+                      ctx.lineJoin = 'round'
+                      ctx.strokeText(label, node.x!, node.y! + r + 2)
+                      ctx.fillStyle = colors.fg
+                      ctx.fillText(label, node.x!, node.y! + r + 2)
+                      ctx.globalAlpha = 1
+                    }
+                  }}
+                />
+              )}
+
+              {tooltip && (
+                <div className="absolute bottom-4 left-4 bg-card border border-border rounded-lg shadow-lg p-4 max-w-xs z-10">
+                  <h3 className="font-semibold text-sm mb-1 text-foreground">{tooltip.title}</h3>
+                  {tooltip.category && (
+                    <p className="text-xs text-muted-foreground mb-2">{tooltip.category}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {tooltip.connectionCount} connection(s)
+                  </p>
+                  {tooltip.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {tooltip.tags.map(tag => (
+                        <span
+                          key={tag}
+                          className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <Link
+                    href={`/materials/${tooltip.nodeId}`}
+                    className="text-xs font-medium text-primary hover:underline inline-block"
+                  >
+                    Open material →
+                  </Link>
+                </div>
               )}
             </div>
 
-            {(categoryColors.size > 0 || hasUncategorized) && (
-              <div>
-                <h4 className="font-semibold text-foreground text-sm mb-3">Categories</h4>
-                <ul className="space-y-1.5">
-                  {[...categoryColors].map(([cat, color]) => (
-                    <li key={cat} className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="truncate">{cat}</span>
-                    </li>
-                  ))}
-                  {hasUncategorized && (
-                    <li className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: uncategorizedColor }}
-                      />
-                      <span className="truncate">Uncategorized</span>
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </aside>
-
-          <div ref={containerRef} className="relative flex-1 min-w-0 h-[55vh] lg:h-auto">
-            {colors && (
-              <ForceGraph2D
-                ref={fgRef as never}
-                graphData={graphData}
-                width={width}
-                height={height}
-                backgroundColor={colors.bg}
-                cooldownTicks={120}
-                onEngineStop={() => {
-                  if (!didFitRef.current) {
-                    fgRef.current?.zoomToFit(400, 60)
-                    didFitRef.current = true
-                  }
-                }}
-                onNodeHover={(node: FGNode | null) => setHoverId(node?.id ?? null)}
-                onNodeClick={(node: FGNode) => handleNodeClick(node)}
-                onBackgroundClick={() => setTooltip(null)}
-                nodeVisibility={(node: FGNode) => showOrphans || node.degree > 0}
-                linkVisibility={(l: FGLink) => l.strength >= minStrength}
-                linkColor={(l: FGLink) =>
-                  hoverId &&
-                  (linkEndId(l.source) === hoverId || linkEndId(l.target) === hoverId)
-                    ? colors.primary
-                    : colors.border
-                }
-                linkWidth={(l: FGLink) => {
-                  const active =
-                    hoverId &&
-                    (linkEndId(l.source) === hoverId || linkEndId(l.target) === hoverId)
-                  return Math.max(1, l.strength * 4) * (active ? 1.8 : 1)
-                }}
-                nodeRelSize={1}
-                nodePointerAreaPaint={(node: FGNode, color: string, ctx: CanvasRenderingContext2D) => {
-                  ctx.fillStyle = color
-                  ctx.beginPath()
-                  ctx.arc(node.x!, node.y!, node.r * nodeScale + 3, 0, 2 * Math.PI)
-                  ctx.fill()
-                }}
-                nodeCanvasObject={(node: FGNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-                  const matchesHover = !highlightNodes || highlightNodes.has(node.id)
-                  const matchesSearch = !searchIds || searchIds.has(node.id)
-                  const active = matchesHover && matchesSearch
-                  const isHover = node.id === hoverId
-                  const isSearchHit = searchIds?.has(node.id) ?? false
-                  const r = node.r * nodeScale
-                  const fill = nodeColor(node.category)
-
-                  ctx.save()
-                  ctx.globalAlpha = active ? 1 : 0.1
-                  ctx.beginPath()
-                  ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
-                  ctx.fillStyle = fill
-                  ctx.shadowColor = fill
-                  ctx.shadowBlur = isHover ? 16 : isSearchHit ? 12 : 0
-                  ctx.fill()
-                  ctx.restore()
-
-                  const showLabel =
-                    isHover ||
-                    isSearchHit ||
-                    globalScale > labelThreshold ||
-                    (highlightNodes?.has(node.id) ?? false)
-                  if (showLabel) {
-                    const fontSize = Math.max(11 / globalScale, 2)
-                    ctx.font = `${fontSize}px Inter, system-ui, sans-serif`
-                    ctx.textAlign = 'center'
-                    ctx.textBaseline = 'top'
-                    ctx.globalAlpha = active ? 1 : 0.2
-                    ctx.fillStyle = colors.fg
-                    const label = node.label.length > 28 ? node.label.slice(0, 27) + '…' : node.label
-                    ctx.fillText(label, node.x!, node.y! + r + 2)
-                    ctx.globalAlpha = 1
-                  }
-                }}
-              />
-            )}
-
-            {tooltip && (
-              <div className="absolute bottom-4 left-4 bg-card border border-border rounded-lg shadow-lg p-4 max-w-xs z-10">
-                <h3 className="font-semibold text-sm mb-1 text-foreground">{tooltip.title}</h3>
-                {tooltip.category && (
-                  <p className="text-xs text-muted-foreground mb-2">{tooltip.category}</p>
-                )}
-                <p className="text-xs text-muted-foreground mb-2">
-                  {tooltip.connectionCount} connection(s)
-                </p>
-                {tooltip.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {tooltip.tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <Link
-                  href={`/materials/${tooltip.nodeId}`}
-                  className="text-xs font-medium text-primary hover:underline inline-block"
-                >
-                  Open material →
-                </Link>
-              </div>
-            )}
-          </div>
-
-          <aside
-            className={cn(
-              'w-full lg:w-56 shrink-0 border-t lg:border-t-0 lg:border-l border-border bg-card overflow-y-auto p-4 space-y-5',
-              rightOpen ? 'block' : 'hidden lg:block'
-            )}
-          >
-            <div>
-              <h4 className="font-semibold text-foreground text-sm mb-3">Forces</h4>
-              <div className="space-y-3">
-                <Slider
-                  label="Repel"
-                  value={-repel}
-                  min={20}
-                  max={400}
-                  step={10}
-                  onChange={v => setRepel(-v)}
-                />
-                <Slider
-                  label="Link distance"
-                  value={linkDistance}
-                  min={20}
-                  max={200}
-                  step={5}
-                  onChange={setLinkDistance}
-                />
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-foreground text-sm mb-3">Display</h4>
-              <div className="space-y-3">
-                <Slider
-                  label="Node size"
-                  value={nodeScale}
-                  min={0.5}
-                  max={2.5}
-                  step={0.1}
-                  onChange={setNodeScale}
-                  format={v => `${v.toFixed(1)}x`}
-                />
-                <Slider
-                  label="Text fade"
-                  value={labelThreshold}
-                  min={0}
-                  max={2}
-                  step={0.05}
-                  onChange={setLabelThreshold}
-                  format={v => v.toFixed(2)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-foreground text-sm mb-3">Filters</h4>
-              <div className="space-y-3">
-                <Slider
-                  label="Min strength"
-                  value={minStrength}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  onChange={setMinStrength}
-                  format={v => `${Math.round(v * 100)}%`}
-                />
-                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showOrphans}
-                    onChange={e => setShowOrphans(e.target.checked)}
-                    className="accent-primary cursor-pointer"
-                  />
-                  Show orphans
-                </label>
-              </div>
-            </div>
-
-            <button
-              onClick={resetControls}
-              className="w-full text-xs px-3 py-1.5 border border-border rounded hover:bg-muted text-foreground transition-colors"
+            <aside
+              className={cn(
+                'w-full lg:w-56 shrink-0 border-t lg:border-t-0 lg:border-l border-border bg-card overflow-y-auto p-4 space-y-5',
+                rightOpen ? 'block' : 'hidden lg:block'
+              )}
             >
-              Reset
-            </button>
-          </aside>
-        </div>
+              <div>
+                <h4 className="font-semibold text-foreground text-sm mb-3">Forces</h4>
+                <div className="space-y-3">
+                  <Slider
+                    label="Repel"
+                    value={-repel}
+                    min={20}
+                    max={400}
+                    step={10}
+                    onChange={v => setRepel(-v)}
+                  />
+                  <Slider
+                    label="Link distance"
+                    value={linkDistance}
+                    min={20}
+                    max={200}
+                    step={5}
+                    onChange={setLinkDistance}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-foreground text-sm mb-3">Display</h4>
+                <div className="space-y-3">
+                  <Slider
+                    label="Node size"
+                    value={nodeScale}
+                    min={0.5}
+                    max={2.5}
+                    step={0.1}
+                    onChange={setNodeScale}
+                    format={v => `${v.toFixed(1)}x`}
+                  />
+                  <Slider
+                    label="Text fade"
+                    value={labelThreshold}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    onChange={setLabelThreshold}
+                    format={v => v.toFixed(2)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-foreground text-sm mb-3">Filters</h4>
+                <div className="space-y-3">
+                  <Slider
+                    label="Min strength"
+                    value={minStrength}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    onChange={setMinStrength}
+                    format={v => `${Math.round(v * 100)}%`}
+                  />
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showOrphans}
+                      onChange={e => setShowOrphans(e.target.checked)}
+                      className="accent-primary cursor-pointer"
+                    />
+                    Show orphans
+                  </label>
+                </div>
+              </div>
+
+              <button
+                onClick={resetControls}
+                className="w-full text-xs px-3 py-1.5 border border-border rounded hover:bg-muted text-foreground transition-colors"
+              >
+                Reset
+              </button>
+            </aside>
+          </div>
         </>
       )}
     </div>
