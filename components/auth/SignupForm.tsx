@@ -15,6 +15,7 @@ export default function SignupForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -34,6 +35,12 @@ export default function SignupForm() {
     // Validate password requirements
     if (!passwordValidation.isValid) {
       setError(passwordValidation.errors[0])
+      return
+    }
+
+    // Require acknowledgement of the privacy policy
+    if (!agreedToPrivacy) {
+      setError('Please accept the Privacy Policy to continue')
       return
     }
 
@@ -180,6 +187,28 @@ export default function SignupForm() {
         />
       </div>
 
+      <label className="flex items-start gap-3 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={agreedToPrivacy}
+          onChange={(e) => setAgreedToPrivacy(e.target.checked)}
+          disabled={isLoading}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary focus:ring-2 focus:ring-primary"
+        />
+        <span>
+          I agree to the{' '}
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline font-semibold"
+          >
+            Privacy Policy
+          </a>
+          .
+        </span>
+      </label>
+
       {error && (
         <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm font-medium">
           {error}
@@ -188,7 +217,7 @@ export default function SignupForm() {
 
       <button
         type="submit"
-        disabled={isLoading || !passwordValidation.isValid}
+        disabled={isLoading || !passwordValidation.isValid || !agreedToPrivacy}
         className="w-full py-3 px-6 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-colors font-semibold"
       >
         {isLoading ? 'Creating account...' : 'Sign Up'}
