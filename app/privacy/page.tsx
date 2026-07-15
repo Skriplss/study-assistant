@@ -16,7 +16,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-background px-4 py-12">
       <article className="mx-auto w-full max-w-3xl space-y-8 text-foreground">
         <header className="space-y-2">
-          <h1 className="font-serif text-4xl">Privacy Policy</h1>
+          <h1 className="text-4xl font-semibold">Privacy Policy</h1>
           <p className="text-sm text-muted-foreground">Last updated: {LAST_UPDATED}</p>
         </header>
 
@@ -156,7 +156,7 @@ export default function PrivacyPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 className="font-serif text-2xl text-foreground">{title}</h2>
+      <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
       <div className="space-y-3 text-muted-foreground leading-relaxed">{children}</div>
     </section>
   )
