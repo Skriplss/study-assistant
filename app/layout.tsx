@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
-import { Inter, Instrument_Serif } from 'next/font/google'
+import { Geist, Instrument_Serif } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/lib/contexts/ThemeContext'
 import { AuthProvider } from '@/lib/auth/session'
 import { ToastProvider } from '@/components/ui/Toast'
 
-const sans = Inter({
+const sans = Geist({
   subsets: ['latin', 'cyrillic'],
   variable: '--font-sans',
   display: 'swap',
