@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { SheepEasterEgg } from './SheepEasterEgg'
 import { FeedbackButton } from './FeedbackButton'
 
@@ -15,6 +16,13 @@ export function Footer() {
           </div>
 
           <div className="flex items-center gap-4">
+            <Link
+              href="/privacy"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Privacy
+            </Link>
+            <span className="hidden sm:inline text-muted-foreground/50">•</span>
             <FeedbackButton />
             <span className="hidden sm:inline text-muted-foreground/50">•</span>
             <div className="flex items-center gap-2">
