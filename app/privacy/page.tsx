@@ -6,10 +6,11 @@ export const metadata: Metadata = {
 }
 
 // Last updated: keep in sync with material changes to data handling.
-const LAST_UPDATED = 'July 13, 2026'
+const LAST_UPDATED = 'July 16, 2026'
 
-// TODO: replace with your real operator details before going live.
-const CONTACT_EMAIL = 'privacy@your-domain.example'
+// Sections 1, 8 and 9 route every GDPR access/erasure request here, and account
+// deletion is request-only — this mailbox must stay monitored.
+const CONTACT_EMAIL = 'studyassistant.privacy@gmail.com'
 
 export default function PrivacyPage() {
   return (
@@ -48,15 +49,28 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong className="text-foreground">Your study material</strong> — the
-              documents, notes, text, and links (e.g. YouTube URLs) you upload, plus the
-              parsed content and AI-generated artifacts we derive from them (summaries,
-              quizzes, concept graphs, tags).
+              documents, notes, text, images, and links (e.g. YouTube URLs) you upload,
+              plus the parsed content and AI-generated artifacts we derive from them
+              (summaries, quizzes, concept graphs, tags).
             </li>
             <li>
               <strong className="text-foreground">Usage &amp; progress data</strong> —
-              quiz scores and study progress, stored in our own database to power your
-              analytics dashboard. This is first-party only; we run no third-party
-              analytics or advertising trackers.
+              quiz scores, the answers you write, and study progress, stored in our own
+              database to power your analytics dashboard. This is first-party only; we
+              run no third-party analytics or advertising trackers.
+            </li>
+            <li>
+              <strong className="text-foreground">Feedback reports</strong> — if you send
+              a bug report or idea through the in-app widget, we store your message along
+              with the page you sent it from and your browser&rsquo;s user-agent string,
+              so we can reproduce the problem.
+            </li>
+            <li>
+              <strong className="text-foreground">Server logs</strong> — our hosting
+              provider records standard request logs, which include your IP address. Our
+              own application logs record identifiers such as your user ID, along with
+              the titles, filenames and tags of material you upload. The contents of your
+              documents are never written to logs.
             </li>
             <li>
               <strong className="text-foreground">Essential cookies</strong> — see
@@ -69,10 +83,12 @@ export default function PrivacyPage() {
           <p>
             We process your account data and study material to{' '}
             <strong className="text-foreground">perform our contract with you</strong> —
-            i.e. to provide the Service you signed up for (Art. 6(1)(b) GDPR). If we ever
-            want to use your data for anything beyond running the Service — such as
-            training our own models or marketing — we will ask for your separate, explicit
-            consent first.
+            i.e. to provide the Service you signed up for (Art. 6(1)(b) GDPR). Feedback
+            reports and server logs are processed under our{' '}
+            <strong className="text-foreground">legitimate interest</strong> in keeping
+            the Service secure and working (Art. 6(1)(f) GDPR). If we ever want to use
+            your data for anything beyond running the Service — such as training our own
+            models or marketing — we will ask for your separate, explicit consent first.
           </p>
         </Section>
 
@@ -84,8 +100,15 @@ export default function PrivacyPage() {
           </p>
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              <strong className="text-foreground">Supabase</strong> — database, storage,
-              and authentication (hosts your account and material).
+              <strong className="text-foreground">Vercel</strong> — hosting. Serves the
+              application and processes every request, including your IP address and
+              user-agent, in its infrastructure logs.
+            </li>
+            <li>
+              <strong className="text-foreground">Supabase</strong> — database, file
+              storage, and authentication (hosts your account and material, and sends
+              account emails such as password resets). Supabase also records sign-in IP
+              addresses in its own audit log.
             </li>
             <li>
               <strong className="text-foreground">Google (Gemini API)</strong> — receives
@@ -93,14 +116,22 @@ export default function PrivacyPage() {
               artifacts.
             </li>
             <li>
-              <strong className="text-foreground">Groq</strong> — receives your material
-              content as an AI processing fallback for the same purposes.
+              <strong className="text-foreground">Groq</strong> — receives the same
+              content as an AI processing fallback, and additionally receives{' '}
+              <strong className="text-foreground">images you upload</strong> in order to
+              extract text from them.
             </li>
           </ul>
           <p>
             Content sent to these AI providers is used to return a result to you and is
             subject to their respective terms; we do not authorize them to train on your
             content.
+          </p>
+          <p>
+            When you add material by link, our servers fetch that URL — or, for a YouTube
+            link, its transcript — from the internet on your behalf. The request comes
+            from us, not from your browser, and carries no identifier of you. Be aware
+            that the site at the other end will see a request from our servers.
           </p>
         </Section>
 
@@ -115,15 +146,38 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="6. How long we keep it">
+        <Section title="6. How we protect it">
           <p>
-            We retain your account and material for as long as your account is active.
-            When you delete material, or your account, the associated data is removed from
-            our database; backups and provider logs are purged on their normal cycles.
+            Traffic to the Service is encrypted in transit with TLS, and your data is
+            encrypted at rest by our infrastructure providers. Uploaded files live in a
+            private storage bucket, partitioned per user, that is not reachable by public
+            URL. Session cookies are <code className="text-sm">httpOnly</code>, so they
+            cannot be read by scripts in your browser. Access to your material is scoped
+            to your account, and only the operator can read incoming feedback reports.
+          </p>
+          <p>
+            No service can promise perfect security, but we aim to hold only what the
+            Service needs in order to work.
           </p>
         </Section>
 
-        <Section title="7. Your rights">
+        <Section title="7. How long we keep it">
+          <p>
+            We retain your account and material for as long as your account is active.
+            When you delete a material, we remove the original file you uploaded, its
+            parsed text, and everything derived from it — quizzes, questions, your
+            answers, concept-graph links, and progress snapshots. This is immediate and
+            cannot be undone.
+          </p>
+          <p>
+            Until you delete it, material is kept indefinitely: we hold both the original
+            file and the text extracted from it. To close your account entirely, email us
+            (see section 8) and we will delete it together with all associated data.
+            Backups and provider logs are purged on their normal cycles.
+          </p>
+        </Section>
+
+        <Section title="8. Your rights">
           <p>
             Under the GDPR and similar laws you can request access to, correction of,
             export of, or deletion of your personal data, and object to or restrict its
@@ -136,7 +190,21 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="8. Changes to this policy">
+        <Section title="9. Age requirement">
+          <p>
+            The Service is not intended for children. You must be at least 16 years old to
+            create an account, or the minimum age at which you can consent to online
+            services in your country, if that is higher. We do not knowingly collect data
+            from children below that age; if you believe a child has given us their data,
+            email{' '}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">
+              {CONTACT_EMAIL}
+            </a>{' '}
+            and we will delete it.
+          </p>
+        </Section>
+
+        <Section title="10. Changes to this policy">
           <p>
             We may update this policy as the Service evolves. Material changes will be
             reflected by the &ldquo;Last updated&rdquo; date above.
