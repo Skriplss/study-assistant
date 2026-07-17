@@ -624,7 +624,17 @@ export class AIService {
         }),
       })
 
-      if (!res.ok || !res.body) {
+      if (!res.ok) {
+        const err = await this.toHttpError(res)
+        // A 429 means the TPM window is spent. The buffered path would retry
+        // behind `retry-after` (Groq asks for ~25s), stalling the stream and
+        // re-spending the window — so surface it and let the caller say so.
+        if (err.code === 'rate_limit' || err.code === 'quota') throw err
+        // 5xx / transient: the buffered path retries.
+        yield await this.chat(messages, opts)
+        return
+      }
+      if (!res.body) {
         yield await this.chat(messages, opts)
         return
       }

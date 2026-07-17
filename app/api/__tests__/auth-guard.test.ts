@@ -57,6 +57,7 @@ const ID_CTX = { params: Promise.resolve({ id: 'some-id' }) }
 const ROUTES: RouteCase[] = [
   { name: 'GET /api/materials', handler: () => load('../materials/route').GET },
   { name: 'POST /api/materials', handler: () => load('../materials/route').POST, body: {} },
+  { name: 'POST /api/materials/upload-url', handler: () => load('../materials/upload-url/route').POST, body: { fileName: 'a.pdf', fileSize: 1 } },
   { name: 'GET /api/materials/[id]', handler: () => load('../materials/[id]/route').GET, ctx: ID_CTX },
   { name: 'PUT /api/materials/[id]', handler: () => load('../materials/[id]/route').PUT, ctx: ID_CTX, body: {} },
   { name: 'DELETE /api/materials/[id]', handler: () => load('../materials/[id]/route').DELETE, ctx: ID_CTX },

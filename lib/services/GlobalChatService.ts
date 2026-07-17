@@ -15,7 +15,14 @@ export interface ChatContext {
 }
 
 const MAX_SOURCES = 4
-const TOTAL_BUDGET = 14_000
+/**
+ * Chars of source text per question, measured against Groq's 8k tokens-per-minute
+ * ceiling for LARGE_MODEL (~3.9 chars/token on this content). The sources are
+ * re-sent every turn, so this is the dominant recurring cost: at 14k chars a
+ * single question spent ~5.7k TPM and the *next* one 429'd for ~25s. At 7k,
+ * two questions land back-to-back before the window runs out.
+ */
+const TOTAL_BUDGET = 7_000
 
 export class GlobalChatService {
   /**

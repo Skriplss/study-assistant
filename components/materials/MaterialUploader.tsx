@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { validateMaterialFile } from '@/lib/materials/file-validation'
+import { validateMaterialFile, MAX_FILE_SIZE } from '@/lib/materials/file-validation'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
+import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/lib/auth/session'
 import { useMetadataSuggestions } from '@/lib/hooks/useMetadataSuggestions'
 import TagInput from './TagInput'
@@ -12,13 +13,11 @@ import { Button } from '@/components/ui/Button'
 interface MaterialUploaderProps {
   onUploadComplete?: (materialId: string) => void
   onUploadError?: (error: Error) => void
-  maxFileSize?: number
 }
 
 export default function MaterialUploader({
   onUploadComplete,
   onUploadError,
-  maxFileSize = 50 * 1024 * 1024,
 }: MaterialUploaderProps) {
   const { user, session } = useAuth()
   const { tagSuggestions, categorySuggestions } = useMetadataSuggestions(
@@ -90,34 +89,51 @@ export default function MaterialUploader({
   
     try {
       setUploadProgress(10)
-  
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('title', title || file.name.replace(/\.[^/.]+$/, ''))
-      if (category) formData.append('category', category)
-      if (tags.length > 0) formData.append('tags', tags.join(','))
-  
+
+      // The file goes browser → Supabase Storage directly. Routing bytes through the
+      // API instead would hit Vercel's 4.5MB request body cap at the edge.
+      const urlResponse = await fetchWithAuth(session, '/api/materials/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, fileSize: file.size }),
+      })
+
+      if (!urlResponse.ok) {
+        const data = await urlResponse.json().catch(() => ({}))
+        throw new Error(data.error || 'Could not start upload')
+      }
+
+      const { materialId, filePath, token, bucket } = await urlResponse.json()
+      setUploadProgress(25)
+
+      const { error: storageError } = await supabase.storage
+        .from(bucket)
+        .uploadToSignedUrl(filePath, token, file)
+
+      if (storageError) {
+        throw new Error(`Upload failed: ${storageError.message}`)
+      }
+
+      setUploadProgress(75)
+
+      // Only now does the material row exist — a failure above leaves no broken row.
       const response = await fetchWithAuth(session, '/api/materials', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          materialId,
+          fileName: file.name,
+          title: title || file.name.replace(/\.[^/.]+$/, ''),
+          category: category || undefined,
+          tags: tags.length > 0 ? tags : undefined,
+        }),
       })
-  
-      setUploadProgress(75)
-  
+
       if (!response.ok) {
-        // Check if response is JSON
-        const contentType = response.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          const data = await response.json()
-          throw new Error(data.error || 'Upload failed')
-        } else {
-          // Server returned non-JSON (probably HTML error page)
-          const text = await response.text()
-          console.error('Server error:', text)
-          throw new Error('Server error. Please check console for details.')
-        }
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Upload failed')
       }
-  
+
       const { material } = await response.json()
       setUploadProgress(100)
 
@@ -297,8 +313,8 @@ export default function MaterialUploader({
               </label>
             </p>
             <p className="text-sm text-muted-foreground">
-              Supported formats: PDF, TXT, MD, PPTX, PNG, JPG, JPEG (max {maxFileSize / 1024 / 1024}
-              MB)
+              Supported formats: PDF, TXT, MD, PPTX, PNG, JPG, JPEG (max{' '}
+              {MAX_FILE_SIZE / 1024 / 1024}MB)
             </p>
           </>
         ) : (

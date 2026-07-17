@@ -272,3 +272,64 @@ describe('AIService.verifyAnswer', () => {
     expect(result.feedback).toContain('Good')
   })
 })
+
+describe('AIService.streamChat', () => {
+  const originalKey = process.env.GROQ_API_KEY
+
+  beforeEach(() => {
+    process.env.GROQ_API_KEY = 'test-key'
+    AIService.resetFetchImplementation()
+  })
+
+  afterEach(() => {
+    process.env.GROQ_API_KEY = originalKey
+    AIService.resetFetchImplementation()
+  })
+
+  async function drain(gen: AsyncGenerator<string>): Promise<string> {
+    let out = ''
+    for await (const delta of gen) out += delta
+    return out
+  }
+
+  // A rate limit used to fall through to the buffered path, which retried behind
+  // Groq's ~25s retry-after and then surfaced as a generic failure. The caller
+  // needs the code to tell the user how long to wait.
+  it('surfaces a rate limit instead of falling back to the buffered path', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'retry-after': '23' }),
+      json: async () => ({ error: { message: 'Rate limit reached ... (TPM): Limit 8000' } }),
+    })
+    AIService.setFetchImplementation(fetchMock)
+
+    await expect(drain(AIService.streamChat([{ role: 'user', content: 'hi' }]))).rejects.toMatchObject(
+      { code: 'rate_limit', retryAfterSeconds: 23 }
+    )
+    // No second call: the buffered path must not re-spend the exhausted window.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('still falls back to the buffered path on a server error', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'unavailable' } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({ choices: [{ message: { content: 'buffered answer' } }] }),
+      })
+    AIService.setFetchImplementation(fetchMock)
+
+    await expect(drain(AIService.streamChat([{ role: 'user', content: 'hi' }]))).resolves.toBe(
+      'buffered answer'
+    )
+  })
+})

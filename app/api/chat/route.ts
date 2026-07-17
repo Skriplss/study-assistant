@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { AIService } from '@/lib/services/AIService'
 import { ConversationService } from '@/lib/services/ConversationService'
 import { GlobalChatService } from '@/lib/services/GlobalChatService'
+import { getUserFriendlyAIError } from '@/lib/ai/errors'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -91,7 +92,10 @@ Instructions:
       role: 'assistant',
       content: 'Understood. I will answer using only the provided sources and cite them by title.',
     })
-    messages.push(...(history as ChatMessage[]).slice(-10))
+    // Two exchanges. Every turn re-sends the sources, so history is the one part
+    // of the prompt that grows unboundedly — at ~600 tokens per past answer, ten
+    // messages cost more TPM than the sources themselves.
+    messages.push(...(history as ChatMessage[]).slice(-4))
     messages.push({ role: 'user', content: message })
 
     const stream = new ReadableStream<Uint8Array>({
@@ -103,13 +107,18 @@ Instructions:
         try {
           for await (const delta of AIService.streamChat(messages, {
             model: AIService.LARGE_MODEL,
+            // Sized to measured answers (~300-600 tokens) rather than headroom:
+            // it counts against the same 8k TPM the sources are competing for.
+            maxTokens: 900,
           })) {
             answer += delta
             controller.enqueue(encoder.encode(delta))
           }
         } catch (err) {
           console.error('Global chat stream error:', err)
-          controller.enqueue(encoder.encode('\n[Error generating response]'))
+          // Enqueued, not appended to `answer` — the notice is for this render
+          // only and must not be persisted as the assistant turn.
+          controller.enqueue(encoder.encode(`\n${getUserFriendlyAIError(err)}`))
         } finally {
           controller.close()
 

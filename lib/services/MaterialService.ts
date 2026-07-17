@@ -1,12 +1,26 @@
 import 'server-only'
  
 import { getSupabaseAdmin } from '@/lib/supabase/server'
-import { validateMaterialFile } from '@/lib/materials/file-validation'
+import {
+  validateMaterialFile,
+  validateMaterialUpload,
+} from '@/lib/materials/file-validation'
 import type { StudyMaterial, MaterialMetadata } from '@/lib/types'
- 
+
 type FileType = StudyMaterial['fileType']
 type LinkType = 'youtube' | 'url'
 type ParsingStatus = 'pending' | 'processing' | 'completed' | 'failed'
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The caller sent something bad — routes map this to a 400 rather than a 500. */
+export class MaterialValidationError extends Error {
+  constructor(message = 'Invalid upload') {
+    super(message)
+    this.name = 'MaterialValidationError'
+  }
+}
  
 function mapMaterial(material: any, tags: string[]): StudyMaterial {
   return {
@@ -36,118 +50,128 @@ export class MaterialService {
     return validateMaterialFile(file)
   }
  
-  static async uploadMaterial(
+  /**
+   * Reserve a storage path and hand the browser a signed URL to upload to directly.
+   * Bytes must never transit the API route: Vercel rejects request bodies over 4.5MB
+   * at the edge, before the handler is even invoked.
+   */
+  static async createUploadTarget(
     userId: string,
-    file: File,
-    metadata: MaterialMetadata,
-    onProgress?: (progress: number) => void
-  ): Promise<StudyMaterial> {
-    console.log('[MaterialService] Starting upload:', {
-      userId,
-      fileName: file.name,
-      fileSize: file.size,
-      metadata,
-    })
-
-    const validation = this.validateFile(file)
+    fileName: string,
+    fileSize: number
+  ): Promise<{
+    materialId: string
+    filePath: string
+    token: string
+    bucket: string
+  }> {
+    const validation = validateMaterialUpload(fileName, fileSize)
     if (!validation.valid) {
-      console.log('[MaterialService] Validation failed:', validation.error)
-      throw new Error(validation.error)
+      throw new MaterialValidationError(validation.error)
     }
- 
+
     const db = getSupabaseAdmin()
-    const fileExtension = file.name.split('.').pop()?.toLowerCase() as FileType
+    const fileExtension = fileName.split('.').pop()!.toLowerCase()
     const materialId = crypto.randomUUID()
     const filePath = `${userId}/${materialId}/original.${fileExtension}`
- 
-    console.log('[MaterialService] Generated filePath:', filePath)
 
-    try {
-      if (onProgress) onProgress(10)
+    const { data, error } = await db.storage
+      .from(this.STORAGE_BUCKET)
+      .createSignedUploadUrl(filePath)
 
-      // Check if bucket exists and is accessible
-      console.log('[MaterialService] Checking storage bucket...')
-      const { data: buckets, error: bucketsError } = await db.storage.listBuckets()
-      if (bucketsError) {
-        console.error('[MaterialService] Bucket list error:', bucketsError)
-        throw new Error(`Storage not accessible: ${bucketsError.message}. Please check Supabase Storage configuration.`)
-      }
-      
-      const bucketExists = buckets?.some(b => b.name === this.STORAGE_BUCKET)
-      console.log('[MaterialService] Bucket exists:', bucketExists, 'Available buckets:', buckets?.map(b => b.name))
-      
-      if (!bucketExists) {
-        throw new Error(`Storage bucket "${this.STORAGE_BUCKET}" does not exist. Please create it in Supabase Dashboard under Storage.`)
-      }
- 
-      console.log('[MaterialService] Uploading file to storage...')
-      const { error: uploadError } = await db.storage
-        .from(this.STORAGE_BUCKET)
-        .upload(filePath, file, { cacheControl: '3600', upsert: false })
- 
-      if (uploadError) {
-        console.error('[MaterialService] Storage upload error:', uploadError)
-        throw new Error(`Upload failed: ${uploadError.message}`)
-      }
- 
-      console.log('[MaterialService] File uploaded successfully')
-      if (onProgress) onProgress(50)
- 
-      const materialData = {
-        id: materialId,
-        user_id: userId,
-        title: metadata.title || file.name.replace(/\.[^/.]+$/, ''),
-        file_name: file.name,
-        file_type: fileExtension,
-        file_size: file.size,
-        file_path: filePath,
-        category: metadata.category || null,
-        parsing_status: 'pending' as const,
-      }
- 
-      console.log('[MaterialService] Inserting material to database:', materialData)
-      const { error: dbError } = await db
-        .from('study_materials')
-        .insert(materialData)
-        .select()
-        .single()
- 
-      if (dbError) {
-        console.error('[MaterialService] DB Error:', JSON.stringify(dbError, null, 2))
-        console.log('[MaterialService] Cleaning up uploaded file...')
-        await db.storage.from(this.STORAGE_BUCKET).remove([filePath])
-        throw new Error(`Database error: ${dbError.message}`)
-      }
- 
-      console.log('[MaterialService] Material record created successfully')
-      if (onProgress) onProgress(75)
- 
-      if (metadata.tags && metadata.tags.length > 0) {
-        console.log('[MaterialService] Adding tags:', metadata.tags)
-        const tagData = metadata.tags.map((tag) => ({
-          material_id: materialId,
-          tag: tag.trim().toLowerCase(),
-        }))
-        await db.from('material_tags').insert(tagData)
-        console.log('[MaterialService] Tags added successfully')
-      }
- 
-      if (onProgress) onProgress(100)
- 
-      console.log('[MaterialService] Fetching created material...')
-      return this.getMaterial(materialId)
-    } catch (error) {
-      console.error('[MaterialService] Error in uploadMaterial:', error)
-      // Clean up on error
-      try {
-        console.log('[MaterialService] Attempting cleanup...')
-        await db.storage.from(this.STORAGE_BUCKET).remove([filePath])
-        console.log('[MaterialService] Cleanup successful')
-      } catch (cleanupError) {
-        console.error('[MaterialService] Cleanup failed:', cleanupError)
-      }
-      throw error
+    if (error || !data) {
+      throw new Error(`Could not create upload URL: ${error?.message ?? 'unknown error'}`)
     }
+
+    return {
+      materialId,
+      filePath,
+      token: data.token,
+      bucket: this.STORAGE_BUCKET,
+    }
+  }
+
+  /**
+   * Record a material for a file the browser has already put in storage. The row is
+   * written only once the object is confirmed present, so a browser that dies
+   * mid-upload leaves an orphaned object rather than a material that renders broken.
+   */
+  static async finalizeUpload(
+    userId: string,
+    materialId: string,
+    fileName: string,
+    metadata: MaterialMetadata
+  ): Promise<StudyMaterial> {
+    const db = getSupabaseAdmin()
+
+    // materialId is client-supplied and gets interpolated into a storage path that
+    // this method may remove() on failure. Anything but a plain UUID — `../` above
+    // all — must never reach that path.
+    if (!UUID_PATTERN.test(materialId)) {
+      throw new MaterialValidationError('Invalid material id')
+    }
+
+    // Extension decides the storage path, so check it before building one.
+    const nameCheck = validateMaterialUpload(fileName, 0)
+    if (!nameCheck.valid) {
+      throw new MaterialValidationError(nameCheck.error)
+    }
+
+    const fileExtension = fileName.split('.').pop()?.toLowerCase() as FileType
+
+    // Re-derive the path rather than accept one from the client: a forged path would
+    // point this user's row at somebody else's object.
+    const filePath = `${userId}/${materialId}/original.${fileExtension}`
+
+    // Size comes from storage, never from the client — a signed URL bounds only what
+    // the client *said* it would send, not what it actually sent.
+    const { data: info, error: infoError } = await db.storage
+      .from(this.STORAGE_BUCKET)
+      .info(filePath)
+
+    if (infoError || !info) {
+      throw new MaterialValidationError('Uploaded file not found in storage')
+    }
+
+    const fileSize = info.size ?? 0
+    const sizeCheck = validateMaterialUpload(fileName, fileSize)
+    if (!sizeCheck.valid) {
+      await db.storage.from(this.STORAGE_BUCKET).remove([filePath])
+      throw new MaterialValidationError(sizeCheck.error)
+    }
+
+    const materialData = {
+      id: materialId,
+      user_id: userId,
+      title: metadata.title || fileName.replace(/\.[^/.]+$/, ''),
+      file_name: fileName,
+      file_type: fileExtension,
+      file_size: fileSize,
+      file_path: filePath,
+      category: metadata.category || null,
+      parsing_status: 'pending' as const,
+    }
+
+    const { error: dbError } = await db
+      .from('study_materials')
+      .insert(materialData)
+      .select()
+      .single()
+
+    if (dbError) {
+      await db.storage.from(this.STORAGE_BUCKET).remove([filePath])
+      throw new Error(`Database error: ${dbError.message}`)
+    }
+
+    if (metadata.tags && metadata.tags.length > 0) {
+      const tagData = metadata.tags.map((tag) => ({
+        material_id: materialId,
+        tag: tag.trim().toLowerCase(),
+      }))
+      await db.from('material_tags').insert(tagData)
+    }
+
+    return this.getMaterial(materialId)
   }
  
   /** Create a link-based material (YouTube / web URL) — no file upload. */
