@@ -8,7 +8,6 @@ jest.mock('../AIService', () => ({
   AIService: {
     callWithRetry: jest.fn(),
     getGroqClient: jest.fn(),
-    getGeminiClient: jest.fn(),
     setFetchImplementation: jest.fn(),
     resetFetchImplementation: jest.fn(),
   },
@@ -108,12 +107,17 @@ describe('GraphService.getGraph', () => {
     mockDb.from.mockImplementation((table: string) => {
       if (table === 'study_materials') {
         return makeQuery([
-          { id: 'm1', title: 'Material A', category: 'CS', tags: ['js'] },
-          { id: 'm2', title: 'Material B', category: null, tags: [] },
+          { id: 'm1', title: 'Material A', category: 'CS' },
+          { id: 'm2', title: 'Material B', category: null },
         ])
       }
       if (table === 'material_connections') {
         return makeQuery([])
+      }
+      // Tags are their own table, not a column on study_materials — getGraph
+      // joins them in separately.
+      if (table === 'material_tags') {
+        return makeQuery([{ material_id: 'm1', tag: 'js' }])
       }
       return makeQuery([])
     })

@@ -225,9 +225,15 @@ describe('AIService.verifyAnswer', () => {
 
     const result = await AIService.verifyAnswer(
       {
+        id: 'q1',
+        quizId: 'quiz-1',
         questionText: 'Pick one',
         questionType: 'multiple_choice',
+        difficulty: 'medium',
+        options: ['A', 'B'],
         correctAnswer: 'B',
+        explanation: null,
+        orderIndex: 0,
       },
       'b'
     )
@@ -249,9 +255,15 @@ describe('AIService.verifyAnswer', () => {
 
     const result = await AIService.verifyAnswer(
       {
+        id: 'q2',
+        quizId: 'quiz-1',
         questionText: 'Powerhouse of the cell?',
         questionType: 'open_ended',
+        difficulty: 'medium',
+        options: null,
         correctAnswer: 'mitochondria',
+        explanation: null,
+        orderIndex: 0,
       },
       'the mitochondrion'
     )

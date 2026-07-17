@@ -9,7 +9,7 @@ describe('MaterialParser.parseText', () => {
 
     expect(result.text).toBe(text)
     expect(result.metadata.wordCount).toBe(6)
-    expect(result.metadata.structure.lines).toBe(2)
+    expect(result.metadata.structure.lineCount).toBe(2)
   })
 
   it('should handle empty text file', async () => {
@@ -40,7 +40,8 @@ describe('MaterialParser.parseMarkdown', () => {
 
     expect(result.text).toContain('Heading')
     expect(result.text).toContain('bold')
-    expect(result.metadata.structure.headers).toContain('Heading')
+    // Headers carry their level, so they're objects rather than bare strings.
+    expect(result.metadata.structure.headers).toContainEqual({ level: 1, text: 'Heading' })
   })
 
   it('should extract headers from markdown', async () => {
@@ -49,7 +50,11 @@ describe('MaterialParser.parseMarkdown', () => {
 
     const result = await MaterialParser.parseMarkdown(buffer)
 
-    expect(result.metadata.structure.headers).toEqual(['H1', 'H2', 'H3'])
+    expect(result.metadata.structure.headers).toEqual([
+      { level: 1, text: 'H1' },
+      { level: 2, text: 'H2' },
+      { level: 3, text: 'H3' },
+    ])
   })
 
   it('should convert markdown to plain text', async () => {
@@ -81,13 +86,15 @@ describe('MaterialParser.parseWithTimeout', () => {
   it('should timeout for slow parsing', async () => {
     jest.useFakeTimers()
 
+    // Has to outlast PARSING_TIMEOUT (60s), or the parse wins the race and
+    // there's nothing to reject.
     const parseFunction = () =>
-      new Promise<never>((resolve) => setTimeout(() => resolve({} as never), 35000))
+      new Promise<never>((resolve) => setTimeout(() => resolve({} as never), 90000))
 
     const promise = MaterialParser.parseWithTimeout(parseFunction, 1024)
     const assertion = expect(promise).rejects.toThrow('Parsing timeout exceeded')
 
-    await jest.advanceTimersByTimeAsync(30000)
+    await jest.advanceTimersByTimeAsync(60000)
     await assertion
 
     jest.useRealTimers()
@@ -112,12 +119,31 @@ describe('MaterialParser.parseWithTimeout', () => {
 
 describe('MaterialParser.validateParsedContent', () => {
   it('should validate content with text', () => {
+    // Has to clear both bars the validator sets: 50+ characters and 10+ words.
+    const content = {
+      text: 'This material has enough words and characters in it to count as real parsed content.',
+      metadata: { wordCount: 14 },
+    }
+
+    expect(MaterialParser.validateParsedContent(content)).toBe(true)
+  })
+
+  it('should reject text that is too short to be meaningful', () => {
     const content = {
       text: 'Valid content',
       metadata: { wordCount: 2 },
     }
 
-    expect(MaterialParser.validateParsedContent(content)).toBe(true)
+    expect(MaterialParser.validateParsedContent(content)).toBe(false)
+  })
+
+  it('should reject text with too few words', () => {
+    const content = {
+      text: 'a'.repeat(100),
+      metadata: { wordCount: 1 },
+    }
+
+    expect(MaterialParser.validateParsedContent(content)).toBe(false)
   })
 
   it('should reject empty text', () => {
@@ -153,7 +179,7 @@ describe('MaterialParser.extractSummary', () => {
   })
 
   it('should truncate long text and add ellipsis', () => {
-    const longText = 'a'.repeat(600)
+    const longText = 'a'.repeat(1200)
     const content = {
       text: longText,
       metadata: { wordCount: 1 },
@@ -165,8 +191,20 @@ describe('MaterialParser.extractSummary', () => {
     expect(summary).toContain('...')
   })
 
-  it('should extract exactly 500 characters plus ellipsis', () => {
-    const longText = 'a'.repeat(1000)
+  it('should leave text at the cutoff untouched', () => {
+    const content = {
+      text: 'a'.repeat(1000),
+      metadata: { wordCount: 1 },
+    }
+
+    const summary = MaterialParser.extractSummary(content)
+
+    expect(summary).not.toContain('...')
+    expect(summary.length).toBe(1000)
+  })
+
+  it('should extract exactly 1000 characters plus ellipsis', () => {
+    const longText = 'a'.repeat(2000)
     const content = {
       text: longText,
       metadata: { wordCount: 1 },
@@ -174,6 +212,6 @@ describe('MaterialParser.extractSummary', () => {
 
     const summary = MaterialParser.extractSummary(content)
 
-    expect(summary.length).toBe(503) // 500 + '...'
+    expect(summary.length).toBe(1003) // 1000 + '...'
   })
 })

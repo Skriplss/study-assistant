@@ -81,8 +81,6 @@ describe('validateMaterialFile file type validation', () => {
     const invalidTypes = [
       { name: 'test.doc', type: 'application/msword' },
       { name: 'test.xlsx', type: 'application/vnd.ms-excel' },
-      { name: 'test.png', type: 'image/png' },
-      { name: 'test.jpg', type: 'image/jpeg' },
       { name: 'test.zip', type: 'application/zip' },
     ]
 
@@ -90,6 +88,21 @@ describe('validateMaterialFile file type validation', () => {
       const file = new File(['test'], name, { type })
       const result = validateFile(file)
       expect(result.valid).toBe(false)
+    })
+  })
+
+  // Images became first-class when text extraction from them shipped; they used
+  // to sit in the rejected list above.
+  it('should accept image types', () => {
+    const imageTypes = [
+      { name: 'test.png', type: 'image/png' },
+      { name: 'test.jpg', type: 'image/jpeg' },
+      { name: 'test.jpeg', type: 'image/jpeg' },
+    ]
+
+    imageTypes.forEach(({ name, type }) => {
+      const file = new File(['test'], name, { type })
+      expect(validateFile(file).valid).toBe(true)
     })
   })
 })
