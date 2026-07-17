@@ -353,19 +353,19 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
-    unnest(sm.tags) as tag,
-    AVG(ps.score) as average_score,
-    COUNT(DISTINCT ps.quiz_id) as quiz_count,
-    SUM(q.total_questions) as question_count
+  SELECT
+    mt.tag::TEXT,
+    AVG(ps.score) AS average_score,
+    COUNT(DISTINCT ps.quiz_id) AS quiz_count,
+    SUM(q.total_questions) AS question_count
   FROM progress_snapshots ps
   JOIN quizzes q ON ps.quiz_id = q.id
-  JOIN study_materials sm ON ps.material_id = sm.id
+  -- UNIQUE(material_id, tag) means one row per (material, tag), so a snapshot
+  -- lands in each of its material's tag groups exactly once — no fan-out.
+  JOIN material_tags mt ON mt.material_id = ps.material_id
   WHERE ps.user_id = p_user_id
-    AND ps.snapshot_date >= p_start_date
-    AND sm.tags IS NOT NULL
-    AND array_length(sm.tags, 1) > 0
-  GROUP BY unnest(sm.tags);
+    AND ps.completed_at >= p_start_date
+  GROUP BY mt.tag;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -381,16 +381,16 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
-    sm.category,
-    AVG(ps.score) as average_score,
-    COUNT(DISTINCT ps.quiz_id) as quiz_count,
-    SUM(q.total_questions) as question_count
+  SELECT
+    sm.category::TEXT,
+    AVG(ps.score) AS average_score,
+    COUNT(DISTINCT ps.quiz_id) AS quiz_count,
+    SUM(q.total_questions) AS question_count
   FROM progress_snapshots ps
   JOIN quizzes q ON ps.quiz_id = q.id
   JOIN study_materials sm ON ps.material_id = sm.id
   WHERE ps.user_id = p_user_id
-    AND ps.snapshot_date >= p_start_date
+    AND ps.completed_at >= p_start_date
     AND sm.category IS NOT NULL
   GROUP BY sm.category;
 END;
