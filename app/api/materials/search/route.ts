@@ -35,7 +35,15 @@ export async function GET(request: NextRequest) {
       categories,
     })
 
-    return NextResponse.json(results)
+    // SearchService hands back the full material because GlobalChatService needs
+    // parsed_content to build chat context. Over the wire it's dead weight — up
+    // to 50 whole documents for a UI that only renders the snippet.
+    const payload = results.map(result => ({
+      ...result,
+      material: { ...result.material, parsedContent: null },
+    }))
+
+    return NextResponse.json(payload)
   } catch (error) {
     console.error('Search error:', error)
     return NextResponse.json({ error: 'Search failed' }, { status: 500 })
