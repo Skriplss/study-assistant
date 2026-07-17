@@ -122,7 +122,11 @@ Return only a JSON array, e.g. ["concept a", "concept b"]`
     try {
       const response = await AIService.chat([{ role: 'user', content: prompt }], {
         temperature: 0.2,
-        maxTokens: 300,
+        // The array plus thinking measures ~60 tokens. Thinking is spent before
+        // any content, so this can't go near zero (that returns "" rather than
+        // an error) — but max_tokens is billed against TPM up front, so it
+        // shouldn't be fat either. 800 is ~13x the measured need.
+        maxTokens: 800,
       })
 
       // The model may wrap the array in prose — pull out the first JSON array.
