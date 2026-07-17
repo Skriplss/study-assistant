@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import DueReviewsBanner from '@/components/review/DueReviewsBanner'
 
 const AnalyticsDashboard = dynamic(
   () => import('@/components/analytics/AnalyticsDashboard').then(mod => ({ default: mod.AnalyticsDashboard })),
@@ -28,6 +29,8 @@ export default function DashboardPage() {
         </p>
       </div>
       
+      <DueReviewsBanner />
+
       <div className="flex flex-col sm:flex-row gap-3">
         <Link
           href="/materials"

@@ -2,17 +2,27 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Protected routes that require authentication
+// Protected routes that require authentication.
+// UI routes are listed so an unauthenticated hit redirects to login instead of
+// flashing an empty shell. Listing an API route only buys an earlier 401 — each
+// one re-verifies the Bearer token itself (see the note in the handler) and is
+// the real boundary. /api/chat and /api/feedback are the two that were never
+// added; they work on the Bearer alone, and pulling them under the cookie gate
+// now would couple them to it for no security gain.
 const protectedRoutes = [
   '/dashboard',
   '/materials',
   '/quizzes',
-  '/knowledge-graph',
-  '/analytics',
+  '/review',
+  '/graph',
+  '/chat',
+  '/feedback',
   '/api/materials',
   '/api/tags',
   '/api/categories',
   '/api/quizzes',
+  '/api/review',
+  '/api/conversations',
   '/api/graph',
   '/api/analytics',
 ]
