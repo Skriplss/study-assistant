@@ -2,19 +2,29 @@
  * @jest-environment node
  */
 
+import { NextRequest } from 'next/server'
 import { POST } from '../signup/route'
-import { supabase } from '@/lib/supabase/client'
+import { getSupabaseAdmin } from '@/lib/supabase/server'
 
-jest.mock('@/lib/supabase/client', () => ({
-  supabase: {
-    auth: {
-      signUp: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      insert: jest.fn().mockResolvedValue({ error: null }),
-    })),
+// The route signs up through the service-role client, not the browser one —
+// mocking @/lib/supabase/client left the real client in place and every request
+// came back 400.
+const mockDb = {
+  auth: {
+    signUp: jest.fn(),
   },
+  from: jest.fn(() => ({
+    insert: jest.fn().mockResolvedValue({ error: null }),
+  })),
+}
+
+jest.mock('server-only', () => ({}))
+
+jest.mock('@/lib/supabase/server', () => ({
+  getSupabaseAdmin: jest.fn(() => mockDb),
 }))
+
+const admin = getSupabaseAdmin() as unknown as typeof mockDb
 
 describe('POST /api/auth/signup', () => {
   beforeEach(() => {
@@ -31,12 +41,12 @@ describe('POST /api/auth/signup', () => {
       refresh_token: 'refresh',
     }
 
-    ;(supabase.auth.signUp as jest.Mock).mockResolvedValue({
+    admin.auth.signUp.mockResolvedValue({
       data: { user: mockUser, session: mockSession },
       error: null,
     })
 
-    const request = new Request('http://localhost/api/auth/signup', {
+    const request = new NextRequest('http://localhost/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -54,7 +64,7 @@ describe('POST /api/auth/signup', () => {
   })
 
   it('should reject invalid email', async () => {
-    const request = new Request('http://localhost/api/auth/signup', {
+    const request = new NextRequest('http://localhost/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -71,7 +81,7 @@ describe('POST /api/auth/signup', () => {
   })
 
   it('should reject weak password', async () => {
-    const request = new Request('http://localhost/api/auth/signup', {
+    const request = new NextRequest('http://localhost/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -88,7 +98,7 @@ describe('POST /api/auth/signup', () => {
   })
 
   it('should handle missing fields', async () => {
-    const request = new Request('http://localhost/api/auth/signup', {
+    const request = new NextRequest('http://localhost/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
