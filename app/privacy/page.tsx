@@ -111,15 +111,14 @@ export default function PrivacyPage() {
               addresses in its own audit log.
             </li>
             <li>
-              <strong className="text-foreground">Google (Gemini API)</strong> — receives
-              your material content to generate summaries, quizzes, and other study
-              artifacts.
+              <strong className="text-foreground">Groq</strong> — receives your material
+              content to answer your questions about it and to generate study artifacts,
+              and receives <strong className="text-foreground">images you upload</strong>{' '}
+              in order to extract text from them.
             </li>
             <li>
-              <strong className="text-foreground">Groq</strong> — receives the same
-              content as an AI processing fallback, and additionally receives{' '}
-              <strong className="text-foreground">images you upload</strong> in order to
-              extract text from them.
+              <strong className="text-foreground">Google (Gemini API)</strong> — receives
+              your material content when you generate a quiz from it.
             </li>
           </ul>
           <p>
