@@ -4,9 +4,9 @@ import { getLanguageName } from './language-detection'
 const MAX_CONTENT_CHARS = 16_000
 const SAMPLE_SEGMENTS = 6
 
-// Quiz generation runs on large-context models (Gemini 1M, Groq llama-4-scout
-// ~128k), so we can feed the whole material instead of a 16k sample. Most study
-// docs fit under this and are passed in full; only truly huge docs get sampled.
+// Quiz generation runs on a large-context model (Groq gpt-oss-120b, 131k), so we
+// can feed the whole material instead of a 16k sample. Most study docs fit under
+// this and are passed in full; only truly huge docs get sampled.
 const QUIZ_MAX_CONTENT_CHARS = 100_000
 
 export function truncateContent(content: string): string {
