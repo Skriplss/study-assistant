@@ -23,9 +23,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Send password reset email
+    // Send password reset email. Fall back to the request origin so a missing
+    // NEXT_PUBLIC_APP_URL can't silently mail out an `undefined/...` link.
+    const origin = process.env.NEXT_PUBLIC_APP_URL?.trim() || new URL(request.url).origin
     const { error } = await getSupabaseAdmin().auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password/confirm`,
+      redirectTo: `${origin}/auth/reset-password/confirm`,
     })
 
     if (error) {
