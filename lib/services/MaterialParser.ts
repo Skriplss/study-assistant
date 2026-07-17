@@ -1,4 +1,5 @@
 import pdfParse from 'pdf-parse'
+import sharp from 'sharp'
 import MarkdownIt from 'markdown-it'
 import officeParser from 'officeparser'
 import { Readability } from '@mozilla/readability'
@@ -11,8 +12,13 @@ import type { ParsedContent } from '@/lib/types'
 export class MaterialParser {
   private static readonly PARSING_TIMEOUT = 60000 // 60 seconds for large files
   private static readonly MAX_FILE_SIZE_FOR_TIMEOUT = 20 * 1024 * 1024 // 20MB
-  // Groq vision rejects base64 images over ~4MB; cap raw bytes below that.
+  // Groq vision rejects base64 images over ~4MB. Post-compression safety net —
+  // prepareImageForOcr should keep everything far below this.
   private static readonly MAX_IMAGE_BYTES = 3.75 * 1024 * 1024
+  // The vision model normalises every image to a fixed tile budget: measured,
+  // a 1240x1754 page and a 2480x3508 scan of it both bill 1820 prompt tokens.
+  // So resolution beyond roughly this buys accuracy, never token value.
+  private static readonly OCR_MAX_DIMENSION = 2000
   private static markdown = new MarkdownIt()
 
   /**
@@ -266,18 +272,39 @@ export class MaterialParser {
   /**
    * Parse image file using Groq vision (OCR + diagram/formula description).
    */
+  /**
+   * Shrink an upload to what the vision model actually consumes.
+   *
+   * Uploads are allowed up to 50MB but OCR used to reject anything over ~4MB
+   * outright, so a phone photo of a page failed with "image is too large". The
+   * re-encode costs nothing in token terms (the bill is flat regardless of what
+   * goes in) and puts that ceiling out of reach.
+   */
+  private static async prepareImageForOcr(buffer: ArrayBuffer): Promise<string> {
+    const compressed = await sharp(Buffer.from(buffer))
+      .rotate() // apply EXIF orientation — phone photos are routinely sideways
+      .resize({
+        width: this.OCR_MAX_DIMENSION,
+        height: this.OCR_MAX_DIMENSION,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 85 })
+      .toBuffer()
+
+    if (compressed.byteLength > this.MAX_IMAGE_BYTES) {
+      throw new Error('Image is too large for OCR even after compression')
+    }
+
+    return compressed.toString('base64')
+  }
+
   static async parseImage(buffer: ArrayBuffer, fileType: 'png' | 'jpg' | 'jpeg'): Promise<ParsedContent> {
     try {
-      if (buffer.byteLength > this.MAX_IMAGE_BYTES) {
-        throw new Error(
-          `Image is too large (max ${Math.round(this.MAX_IMAGE_BYTES / 1024 / 1024)}MB for OCR)`
-        )
-      }
+      // Always JPEG on the wire: prepareImageForOcr re-encodes whatever came in.
+      const base64Image = await this.prepareImageForOcr(buffer)
 
-      const base64Image = Buffer.from(buffer).toString('base64')
-      const mimeType = fileType === 'png' ? 'image/png' : 'image/jpeg'
-
-      const extractedText = await AIService.extractImageText(base64Image, mimeType)
+      const extractedText = await AIService.extractImageText(base64Image, 'image/jpeg')
 
       if (!extractedText || extractedText.trim().length === 0) {
         throw new Error('No text or content could be extracted from the image')

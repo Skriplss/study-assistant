@@ -302,9 +302,18 @@ export class MaterialService {
 
     // Link materials (youtube/url) have no stored file to remove.
     if (material.filePath) {
-      await db.storage.from(this.STORAGE_BUCKET).remove([material.filePath])
       const extractedPath = material.filePath.replace(/original\.\w+$/, 'extracted.txt')
-      await db.storage.from(this.STORAGE_BUCKET).remove([extractedPath])
+      const { error: storageError } = await db.storage
+        .from(this.STORAGE_BUCKET)
+        .remove([material.filePath, extractedPath])
+
+      // Stop before dropping the row. These errors used to be discarded, so a
+      // failed removal left the file behind while its only reference vanished —
+      // the bucket still holds one such orphan, and the privacy policy promises
+      // the original goes with the material. Better to fail and be retried.
+      if (storageError) {
+        throw new Error(`Delete failed: could not remove stored files: ${storageError.message}`)
+      }
     }
 
     const { error } = await db
