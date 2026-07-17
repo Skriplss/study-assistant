@@ -59,6 +59,74 @@ export type Database = {
           },
         ]
       }
+      conversations: {
+        Row: {
+          created_at: string
+          id: string
+          material_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          material_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          material_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "study_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          page_url: string | null
+          status: string
+          type: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          page_url?: string | null
+          status?: string
+          type?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          page_url?: string | null
+          status?: string
+          type?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       material_connections: {
         Row: {
           analysis_version: number | null
@@ -135,6 +203,41 @@ export type Database = {
             columns: ["material_id"]
             isOneToOne: false
             referencedRelation: "study_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+          sources: Json | null
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role: string
+          sources?: Json | null
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          sources?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -286,6 +389,50 @@ export type Database = {
             columns: ["material_id"]
             isOneToOne: false
             referencedRelation: "study_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_items: {
+        Row: {
+          created_at: string
+          ease_factor: number
+          interval_days: number
+          last_reviewed_at: string | null
+          next_review_at: string
+          question_id: string
+          repetitions: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ease_factor?: number
+          interval_days?: number
+          last_reviewed_at?: string | null
+          next_review_at?: string
+          question_id: string
+          repetitions?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ease_factor?: number
+          interval_days?: number
+          last_reviewed_at?: string | null
+          next_review_at?: string
+          question_id?: string
+          repetitions?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_items_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
             referencedColumns: ["id"]
           },
         ]

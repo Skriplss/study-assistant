@@ -50,6 +50,20 @@ export interface Quiz {
   createdAt: string
 }
 
+/** Row shape for the quiz history list — no questions or answers loaded. */
+export interface QuizSummary {
+  id: string
+  materialId: string
+  materialTitle: string | null
+  title: string
+  difficulty: 'easy' | 'medium' | 'hard' | 'mixed'
+  totalQuestions: number
+  status: 'draft' | 'in_progress' | 'completed'
+  score: number | null
+  completedAt: string | null
+  createdAt: string
+}
+
 export interface Question {
   id: string
   quizId: string
@@ -70,6 +84,45 @@ export interface Answer {
   isCorrect: boolean
   feedback: string | null
   answeredAt: string
+}
+
+// Chat Types
+export interface ConversationSummary {
+  id: string
+  title: string
+  materialId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatMessageRecord {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  sources: { id: string; title: string }[] | null
+  createdAt: string
+}
+
+// Spaced Repetition Types
+/** A question that's come due, as handed to the review UI. */
+export interface ReviewCard {
+  questionId: string
+  questionText: string
+  questionType: 'multiple_choice' | 'open_ended'
+  options: string[] | null
+  difficulty: 'easy' | 'medium' | 'hard'
+  materialId: string | null
+  materialTitle: string | null
+  dueAt: string
+}
+
+export interface ReviewGradeResult {
+  isCorrect: boolean
+  feedback: string | null
+  correctAnswer: string
+  explanation: string | null
+  nextReviewAt: string
+  intervalDays: number
 }
 
 export interface QuizConfig {
