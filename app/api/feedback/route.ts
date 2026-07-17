@@ -30,9 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    // `feedback` isn't in the generated database.types yet — cast until it's
-    // regenerated (same pattern as other recent tables in this codebase).
-    const { error } = await (getSupabaseAdmin() as any).from('feedback').insert({
+    const { error } = await getSupabaseAdmin().from('feedback').insert({
       user_id: user.id,
       type,
       message: message.slice(0, MAX_MESSAGE),
@@ -56,7 +54,7 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!isAdmin(user.email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { data, error } = await (getSupabaseAdmin() as any)
+    const { data, error } = await getSupabaseAdmin()
       .from('feedback')
       .select('*')
       .order('created_at', { ascending: false })
@@ -82,7 +80,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid id or status' }, { status: 400 })
     }
 
-    const { error } = await (getSupabaseAdmin() as any)
+    const { error } = await getSupabaseAdmin()
       .from('feedback')
       .update({ status: body.status })
       .eq('id', body.id)
