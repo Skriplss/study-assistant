@@ -16,14 +16,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const db = getSupabaseAdmin()
-    const { data: quizzes } = await db
-      .from('quizzes')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+    const quizzes = await QuizService.listQuizzes(user.id)
 
-    return NextResponse.json({ quizzes: quizzes || [] }, { status: 200 })
+    return NextResponse.json({ quizzes }, { status: 200 })
   } catch (error: any) {
     console.error('List quizzes error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

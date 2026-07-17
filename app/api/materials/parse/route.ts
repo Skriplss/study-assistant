@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     const db = getSupabaseAdmin()
     await db
       .from('study_materials')
-      .update({ parsing_status: 'processing' } as any)
+      .update({ parsing_status: 'processing' })
       .eq('id', materialId)
 
     try {
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
           language: parsedContent.language || null,
           parsing_status: 'completed',
           parsing_error: null,
-        } as any)
+        })
         .eq('id', materialId)
 
       if (updateError) {
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
         .update({
           parsing_status: 'failed',
           parsing_error: errorMessage,
-        } as any)
+        })
         .eq('id', materialId)
 
       return NextResponse.json(
