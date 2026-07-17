@@ -3,9 +3,45 @@ import 'server-only'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { AIService } from './AIService'
 import { AnalyticsService } from './AnalyticsService'
-import type { Quiz, QuizConfig, Answer, QuizResults } from '@/lib/types'
+import { ReviewService } from './ReviewService'
+import type { Quiz, QuizConfig, Answer, QuizResults, QuizSummary } from '@/lib/types'
 
 export class QuizService {
+  /** Quiz history, newest first. Skips questions/answers — the list needs neither. */
+  static async listQuizzes(userId: string): Promise<QuizSummary[]> {
+    const db = getSupabaseAdmin()
+
+    const { data, error } = await db
+      .from('quizzes')
+      .select(
+        'id, material_id, title, difficulty, total_questions, status, score, completed_at, created_at, study_materials(title)'
+      )
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw new Error(error.message)
+
+    return (data || []).map((quiz) => {
+      // PostgREST types the embed as object-or-array depending on how it infers
+      // the relationship; material_id is a plain FK, so it's always one row.
+      const material = quiz.study_materials as { title: string } | { title: string }[] | null
+      const materialTitle = Array.isArray(material) ? material[0]?.title : material?.title
+
+      return {
+        id: quiz.id,
+        materialId: quiz.material_id,
+        materialTitle: materialTitle ?? null,
+        title: quiz.title,
+        difficulty: (quiz.difficulty || 'mixed') as QuizSummary['difficulty'],
+        totalQuestions: quiz.total_questions,
+        status: quiz.status as QuizSummary['status'],
+        score: quiz.score,
+        completedAt: quiz.completed_at,
+        createdAt: quiz.created_at || new Date().toISOString(),
+      }
+    })
+  }
+
   static async createQuiz(
     userId: string,
     materialId: string,
@@ -180,13 +216,40 @@ export class QuizService {
       db.from('answers').select('*').eq('quiz_id', quizId),
       db
         .from('quizzes')
-        .select('total_questions, user_id, material_id')
+        .select('total_questions, user_id, material_id, status, score, completed_at')
         .eq('id', quizId)
         .single(),
     ])
 
     if (!quiz || !answers) throw new Error('Quiz not found')
     if (quiz.user_id !== userId) throw new Error('Quiz not found')
+
+    const formatAnswers = () =>
+      answers.map((a) => ({
+        id: a.id,
+        quizId: a.quiz_id,
+        questionId: a.question_id,
+        userAnswer: a.user_answer,
+        isCorrect: a.is_correct,
+        feedback: a.feedback,
+        answeredAt: a.answered_at || new Date().toISOString(),
+      }))
+
+    // Already scored — hand back what was recorded rather than recording it
+    // again. Without this a second call writes a second progress_snapshot and
+    // takes another SM-2 step on every question; the live DB has quizzes with
+    // four identical snapshots seconds apart from exactly that. retakeQuiz
+    // reopens the quiz to 'in_progress', so genuine retakes still fall through.
+    if (quiz.status === 'completed') {
+      return {
+        quizId,
+        score: quiz.score ?? 0,
+        correctCount: answers.filter((a) => a.is_correct).length,
+        totalQuestions: quiz.total_questions,
+        answers: formatAnswers(),
+        completedAt: quiz.completed_at ?? new Date().toISOString(),
+      }
+    }
 
     // Every question must be answered before the quiz can be scored.
     const answeredCount = new Set(answers.map((a) => a.question_id)).size
@@ -197,7 +260,8 @@ export class QuizService {
     const correctCount = answers.filter((a) => a.is_correct).length
     const score = (correctCount / quiz.total_questions) * 100
 
-    // Status update and analytics insert are independent — run concurrently.
+    // Status update, analytics insert and review scheduling are independent —
+    // run concurrently.
     await Promise.all([
       db
         .from('quizzes')
@@ -211,6 +275,11 @@ export class QuizService {
         quiz.total_questions,
         correctCount
       ),
+      // Scheduling is a side benefit of finishing a quiz, not part of it — a
+      // failure here must not cost the user their score.
+      ReviewService.seedFromQuiz(userId, quizId).catch(error => {
+        console.error('Failed to schedule reviews for quiz', quizId, error)
+      }),
     ])
 
     return {
@@ -218,15 +287,7 @@ export class QuizService {
       score,
       correctCount,
       totalQuestions: quiz.total_questions,
-      answers: answers.map((a) => ({
-        id: a.id,
-        quizId: a.quiz_id,
-        questionId: a.question_id,
-        userAnswer: a.user_answer,
-        isCorrect: a.is_correct,
-        feedback: a.feedback,
-        answeredAt: a.answered_at || new Date().toISOString(),
-      })),
+      answers: formatAnswers(),
       completedAt: new Date().toISOString(),
     }
   }
