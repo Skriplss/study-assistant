@@ -24,22 +24,15 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
     () => (quiz.answers ?? []).find((a) => a.questionId === quiz.questions[0]?.id)?.userAnswer ?? ''
   )
   const [submitting, setSubmitting] = useState(false)
+  const [finishing, setFinishing] = useState(false)
 
   const currentQuestion = quiz.questions[currentIndex]
 
-  if (!currentQuestion) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground font-medium">No questions found in this quiz.</p>
-      </div>
-    )
-  }
-
-  const currentAnswer = answers.get(currentQuestion.id)
+  const currentAnswer = currentQuestion ? answers.get(currentQuestion.id) : undefined
   const isAnswered = !!currentAnswer
 
   const handleSubmit = async () => {
-    if (!userAnswer.trim() || submitting || !session) return
+    if (!currentQuestion || !userAnswer.trim() || submitting || !session) return
 
     setSubmitting(true)
     try {
@@ -86,8 +79,23 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, answers])
 
+  // Bails out below every hook, not above them: an early return before the
+  // keydown effect would render a different number of hooks for an empty quiz
+  // than for a loaded one, and React throws the moment it sees both.
+  if (!currentQuestion) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground font-medium">No questions found in this quiz.</p>
+      </div>
+    )
+  }
+
   const handleFinish = async () => {
-    if (!session) return
+    // The button stays mounted while the request is in flight, so without this
+    // an impatient second click scores the quiz twice.
+    if (!session || finishing) return
+
+    setFinishing(true)
     try {
       const res = await fetchWithAuth(session, `/api/quizzes/${quiz.id}/complete`, {
         method: 'POST',
@@ -98,6 +106,8 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
       onComplete()
     } catch {
       toast({ message: 'Failed to complete quiz', variant: 'error' })
+    } finally {
+      setFinishing(false)
     }
   }
 
@@ -254,10 +264,10 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
         ) : (
           <button
             onClick={handleFinish}
-            disabled={answers.size < quiz.questions.length}
+            disabled={finishing || answers.size < quiz.questions.length}
             className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed font-semibold transition-all shadow-md hover:shadow-lg"
           >
-            Finish Quiz
+            {finishing ? 'Finishing…' : 'Finish Quiz'}
           </button>
         )}
       </div>
