@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils/cn'
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/materials', label: 'Materials' },
+  { href: '/quizzes', label: 'Quizzes' },
+  { href: '/review', label: 'Review' },
   { href: '/graph', label: 'Graph' },
   { href: '/chat', label: 'Chat' },
 ]

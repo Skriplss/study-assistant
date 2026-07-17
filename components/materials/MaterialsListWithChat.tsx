@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
-import type { StudyMaterial } from '@/lib/types'
+import type { SearchResult, StudyMaterial } from '@/lib/types'
 import MaterialCard from './MaterialCard'
 import MaterialUploader from './MaterialUploader'
 import { Modal } from '@/components/ui/Modal'
@@ -13,6 +13,15 @@ import { cn } from '@/lib/utils/cn'
 type FilterStatus = 'all' | 'completed' | 'pending' | 'failed'
 type FilterFileType = 'all' | 'pdf' | 'txt' | 'pptx' | 'image' | 'youtube' | 'url'
 type GroupBy = 'none' | 'category' | 'fileType' | 'date'
+
+/**
+ * SearchService drops query terms of 2 characters or fewer (the trigram index
+ * needs 3), so a short query would come back empty rather than unfiltered.
+ * Those stay on the local title match; anything longer goes to the server,
+ * which also reaches parsed content and tags.
+ */
+const hasServerSearchableTerm = (query: string) =>
+  query.trim().split(/\s+/).some(term => term.length > 2)
 
 export default function MaterialsListWithChat() {
   const { session } = useAuth()
@@ -27,6 +36,10 @@ export default function MaterialsListWithChat() {
   const [groupBy, setGroupBy] = useState<GroupBy>('none')
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all')
   const [fileTypeFilter, setFileTypeFilter] = useState<FilterFileType>('all')
+
+  // Material IDs from the server, most relevant first. null = not searching.
+  const [searchRanking, setSearchRanking] = useState<string[] | null>(null)
+  const [searching, setSearching] = useState(false)
 
   const loadMaterials = useCallback(async () => {
     if (!session) return
@@ -54,6 +67,49 @@ export default function MaterialsListWithChat() {
   useEffect(() => {
     loadMaterials()
   }, [loadMaterials])
+
+  // Debounced server search. Runs against parsed content and tags, not just the
+  // titles already in memory.
+  useEffect(() => {
+    if (!session) return
+
+    const query = searchQuery.trim()
+    if (!hasServerSearchableTerm(query)) {
+      setSearchRanking(null)
+      setSearching(false)
+      return
+    }
+
+    let cancelled = false
+    setSearching(true)
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetchWithAuth(
+          session,
+          `/api/materials/search?q=${encodeURIComponent(query)}`
+        )
+        if (cancelled) return
+
+        if (!response.ok) {
+          setSearchRanking(null)
+          return
+        }
+
+        const results: SearchResult[] = await response.json()
+        if (!cancelled) setSearchRanking(results.map(r => r.material.id))
+      } catch {
+        if (!cancelled) setSearchRanking(null)
+      } finally {
+        if (!cancelled) setSearching(false)
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [searchQuery, session])
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -93,11 +149,20 @@ export default function MaterialsListWithChat() {
   // Apply filters — recomputed only when materials or a filter changes,
   // not on every keystroke-driven re-render.
   const filteredMaterials = useMemo(() => {
-    return materials.filter((m) => {
-      if (searchQuery && !m.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false
-      }
+    const query = searchQuery.trim().toLowerCase()
+    let matched = materials
 
+    if (searchRanking) {
+      // Keep the server's relevance order; it ranks title, content and tag hits.
+      const rank = new Map(searchRanking.map((id, index) => [id, index]))
+      matched = matched
+        .filter((m) => rank.has(m.id))
+        .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!)
+    } else if (query) {
+      matched = matched.filter((m) => m.title.toLowerCase().includes(query))
+    }
+
+    return matched.filter((m) => {
       if (statusFilter !== 'all') {
         const statusMap: Record<FilterStatus, string[]> = {
           all: [],
@@ -120,7 +185,7 @@ export default function MaterialsListWithChat() {
 
       return true
     })
-  }, [materials, searchQuery, statusFilter, fileTypeFilter])
+  }, [materials, searchQuery, searchRanking, statusFilter, fileTypeFilter])
 
   // Group materials
   const groupedMaterials = useMemo(() => {
@@ -193,12 +258,19 @@ export default function MaterialsListWithChat() {
 
         {/* Search */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Search</label>
+          <label className="block text-sm font-medium mb-2">
+            Search
+            {searching && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                searching…
+              </span>
+            )}
+          </label>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by title..."
+            placeholder="Search titles & contents..."
             className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
           />
         </div>
