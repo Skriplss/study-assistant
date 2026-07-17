@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
-import type { StudyMaterial } from '@/lib/types'
+import type { ChatMessageRecord, ConversationSummary, StudyMaterial } from '@/lib/types'
+import { cn } from '@/lib/utils/cn'
 
 interface Source {
   id: string
@@ -32,6 +33,9 @@ export function GlobalChat() {
   const [loading, setLoading] = useState(false)
   const [materials, setMaterials] = useState<Pick<StudyMaterial, 'id' | 'title'>[]>([])
   const [scope, setScope] = useState<string>(searchParams.get('material') || 'all')
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -52,6 +56,68 @@ export function GlobalChat() {
     })()
   }, [session])
 
+  const loadConversations = useCallback(async () => {
+    if (!session) return
+    try {
+      const res = await fetchWithAuth(session, '/api/conversations')
+      const data = await res.json()
+      if (res.ok) setConversations(data.conversations ?? [])
+    } catch {
+      /* non-fatal — the sidebar just stays empty */
+    }
+  }, [session])
+
+  useEffect(() => {
+    loadConversations()
+  }, [loadConversations])
+
+  const openConversation = async (id: string) => {
+    if (!session) return
+    setHistoryOpen(false)
+
+    try {
+      const res = await fetchWithAuth(session, `/api/conversations/${id}`)
+      const data = await res.json()
+      if (!res.ok) return
+
+      setConversationId(id)
+      setMessages(
+        (data.messages ?? []).map((m: ChatMessageRecord) => ({
+          role: m.role,
+          content: m.content,
+          sources: m.sources ?? undefined,
+        }))
+      )
+      // Restore the scope the conversation was started with, so follow-ups keep
+      // drawing on the same material.
+      const summary = conversations.find(c => c.id === id)
+      setScope(summary?.materialId ?? 'all')
+    } catch {
+      /* non-fatal — leave the current thread in place */
+    }
+  }
+
+  const startNew = () => {
+    setConversationId(null)
+    setMessages([])
+    setInput('')
+    setHistoryOpen(false)
+  }
+
+  const deleteConversation = async (id: string) => {
+    if (!session) return
+    if (!confirm('Delete this conversation? This cannot be undone.')) return
+
+    try {
+      const res = await fetchWithAuth(session, `/api/conversations/${id}`, { method: 'DELETE' })
+      if (!res.ok) return
+      setConversations(prev => prev.filter(c => c.id !== id))
+      if (conversationId === id) startNew()
+    } catch {
+      /* non-fatal */
+    }
+  }
+
   const send = async (text: string) => {
     const userMessage = text.trim()
     if (!userMessage || loading || !session) return
@@ -70,6 +136,7 @@ export function GlobalChat() {
           message: userMessage,
           history,
           materialId: scope === 'all' ? undefined : scope,
+          conversationId: conversationId ?? undefined,
         }),
       })
 
@@ -78,6 +145,12 @@ export function GlobalChat() {
         setMessages([...base, { role: 'assistant', content: err.error || 'Something went wrong.' }])
         return
       }
+
+      // The server opens a conversation on the first message and reports the id
+      // here — the body is a stream and can't carry it.
+      const newId = res.headers.get('X-Conversation-Id')
+      const isFirstTurn = !conversationId
+      if (newId && !conversationId) setConversationId(newId)
 
       let sources: Source[] = []
       const header = res.headers.get('X-Chat-Sources')
@@ -104,6 +177,10 @@ export function GlobalChat() {
         acc += decoder.decode(value, { stream: true })
         setMessages([...base, { role: 'assistant', content: acc, sources }])
       }
+
+      // Refresh once the turn is written so the sidebar shows the new thread
+      // (and re-sorts existing ones by activity).
+      if (isFirstTurn) loadConversations()
     } catch {
       setMessages([...base, { role: 'assistant', content: 'Failed to get a response.' }])
     } finally {
@@ -116,9 +193,73 @@ export function GlobalChat() {
   const scopeTitle = scope === 'all' ? null : materials.find(m => m.id === scope)?.title
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] min-h-[480px]">
+    <div className="flex gap-4 h-[calc(100vh-12rem)] min-h-[480px]">
+      {/* Conversation history — a drawer on mobile, a rail on desktop. */}
+      <aside
+        className={cn(
+          'flex-col gap-2 w-56 shrink-0 border-r border-border pr-3 overflow-y-auto',
+          historyOpen ? 'flex absolute inset-x-4 top-32 bottom-4 z-20 w-auto border-r-0 rounded-lg border bg-card p-3 shadow-xl' : 'hidden md:flex'
+        )}
+      >
+        <button
+          type="button"
+          onClick={startNew}
+          className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent transition-colors"
+        >
+          + New chat
+        </button>
+
+        {conversations.length === 0 ? (
+          <p className="px-1 py-2 text-xs text-muted-foreground">No saved chats yet.</p>
+        ) : (
+          conversations.map(c => (
+            <div
+              key={c.id}
+              className={cn(
+                'group flex items-center gap-1 rounded-lg transition-colors',
+                conversationId === c.id ? 'bg-primary/10' : 'hover:bg-accent'
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => openConversation(c.id)}
+                className="min-w-0 flex-1 px-2.5 py-2 text-left"
+              >
+                <span className="block truncate text-xs font-medium text-foreground">
+                  {c.title}
+                </span>
+                <span className="block truncate text-[10px] text-muted-foreground">
+                  {new Date(c.updatedAt).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                  {c.materialId && ' · scoped'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteConversation(c.id)}
+                aria-label={`Delete ${c.title}`}
+                className="px-2 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+              >
+                ×
+              </button>
+            </div>
+          ))
+        )}
+      </aside>
+
+      <div className="flex flex-1 min-w-0 flex-col">
       <div className="mb-3 flex items-center gap-2">
-        <label htmlFor="chat-scope" className="text-sm text-muted-foreground shrink-0">
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(o => !o)}
+          aria-expanded={historyOpen}
+          className="md:hidden rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+        >
+          Chats
+        </button>
+        <label htmlFor="chat-scope" className="hidden sm:block text-sm text-muted-foreground shrink-0">
           Scope
         </label>
         <select
@@ -219,6 +360,7 @@ export function GlobalChat() {
           Send
         </button>
       </form>
+      </div>
     </div>
   )
 }
