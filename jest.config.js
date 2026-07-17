@@ -8,6 +8,10 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
+    // jsdom makes jest resolve this package's `browser` export — an ESM bundle
+    // it can't parse. AIService only ever runs server-side, so point jest at the
+    // CJS node build that actually runs in production.
+    '^@google/genai$': '<rootDir>/node_modules/@google/genai/dist/node/index.cjs',
     '^@/(.*)$': '<rootDir>/$1',
   },
   collectCoverageFrom: [
