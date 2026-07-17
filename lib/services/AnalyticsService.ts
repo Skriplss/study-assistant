@@ -129,10 +129,17 @@ export class AnalyticsService {
   ): Promise<TagPerformance[]> {
     const db = getSupabaseAdmin()
 
-    const { data } = await db.rpc('get_performance_by_tag', {
+    const { data, error } = await db.rpc('get_performance_by_tag', {
       p_user_id: userId,
       p_start_date: startDate.toISOString(),
     })
+
+    // An empty breakdown and a broken RPC look identical to the caller, which is
+    // how a 42703 in this function went unnoticed for its whole life. Log it.
+    if (error) {
+      console.error('get_performance_by_tag failed:', error)
+      return []
+    }
 
     if (!data) return []
 
@@ -155,10 +162,15 @@ export class AnalyticsService {
   ): Promise<CategoryPerformance[]> {
     const db = getSupabaseAdmin()
 
-    const { data } = await db.rpc('get_performance_by_category', {
+    const { data, error } = await db.rpc('get_performance_by_category', {
       p_user_id: userId,
       p_start_date: startDate.toISOString(),
     })
+
+    if (error) {
+      console.error('get_performance_by_category failed:', error)
+      return []
+    }
 
     if (!data) return []
 

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import type {
   Quiz,
   Question,
@@ -17,6 +17,13 @@ interface GroqOptions {
   maxTokens: number
   /** Request a JSON object response (Groq json_object mode). */
   json?: boolean
+  /**
+   * Reasoning budget. Every current Groq model thinks by default, and those
+   * tokens are drawn from `maxTokens` before any content is emitted — leave it
+   * unset and a small budget gets spent entirely on thinking, yielding empty
+   * content. 'low'/'medium'/'high' for gpt-oss, 'none'/'default' for qwen.
+   */
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high' | 'default'
 }
 
 export interface ChatMessage {
@@ -27,13 +34,27 @@ export interface ChatMessage {
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 export class AIService {
-  static gemini: GoogleGenerativeAI | null = null
   static readonly MAX_RETRIES = 3
   static readonly TIMEOUT = 45000
   static readonly RETRY_DELAYS = [1000, 2000, 4000]
   static readonly MIN_QUESTIONS = 5
   static readonly MAX_QUESTIONS = 50
-  static readonly VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
+  /** Groq's only vision-capable model since llama-4-scout was retired. */
+  static readonly VISION_MODEL = 'qwen/qwen3.6-27b'
+  /** Long-form / structured work: grounded chat. */
+  static readonly LARGE_MODEL = 'openai/gpt-oss-120b'
+  /** Short, latency-sensitive work: chat, answer checks, concept extraction. */
+  static readonly FAST_MODEL = 'openai/gpt-oss-20b'
+  /**
+   * Quiz generation only — see `callGemini` for why this one path isn't Groq.
+   *
+   * Deliberately the lite model, not `gemini-3.5-flash`: measured on this
+   * workload the frontier model spends ~570 thinking tokens for ~20s per call,
+   * caps at 5 RPM, and returns 503 under any burst, while lite answers in ~1s
+   * with no thinking, allows 15 RPM, and produces the same valid questions.
+   * Free-tier quota is per-model, so the lite model's ceiling is its own.
+   */
+  static readonly QUIZ_MODEL = 'gemini-3.1-flash-lite'
 
   /** Injectable fetch for tests; defaults to global fetch. */
   private static fetchImpl: FetchImpl | null = null
@@ -50,13 +71,15 @@ export class AIService {
     return this.fetchImpl ?? globalThis.fetch
   }
 
-  static getGeminiClient(): GoogleGenerativeAI {
-    if (!this.gemini) {
+  private static genai: GoogleGenAI | null = null
+
+  static getGeminiClient(): GoogleGenAI {
+    if (!this.genai) {
       const apiKey = process.env.GOOGLE_AI_API_KEY
       if (!apiKey) throw new AIServiceError('GOOGLE_AI_API_KEY not configured', 'config')
-      this.gemini = new GoogleGenerativeAI(apiKey)
+      this.genai = new GoogleGenAI({ apiKey })
     }
-    return this.gemini
+    return this.genai
   }
 
   // ---------------------------------------------------------------------------
@@ -72,15 +95,27 @@ export class AIService {
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
   }
 
+  /**
+   * Quiz-only Gemini call — the single non-Groq path in this service.
+   *
+   * Quiz prompts carry the whole material (up to QUIZ_MAX_CONTENT_CHARS, ~25k
+   * tokens), and Groq's free tier bills `max_tokens` against an 8k TPM ceiling
+   * up front, so the prompt alone is rejected 413 before generation starts.
+   * Gemini's 1M context is what makes this path viable at all.
+   */
   private static async callGemini(prompt: string): Promise<string> {
     return this.withTimeout(
       (async () => {
-        const model = this.getGeminiClient().getGenerativeModel({
-          model: 'gemini-2.0-flash',
-          generationConfig: { responseMimeType: 'application/json' },
+        const res = await this.getGeminiClient().models.generateContent({
+          model: this.QUIZ_MODEL,
+          contents: prompt,
+          config: { responseMimeType: 'application/json' },
         })
-        const result = await model.generateContent(prompt)
-        return result.response.text()
+        // `.text` concatenates the text parts and drops thought parts, so
+        // thinking can't leak into the JSON.
+        const text = res.text
+        if (!text) throw new AIServiceError('Empty response from Gemini', 'parse')
+        return text
       })(),
       this.TIMEOUT
     )
@@ -130,6 +165,7 @@ export class AIService {
       temperature: opts.temperature,
       max_tokens: opts.maxTokens,
       ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
+      ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
     })
   }
 
@@ -188,8 +224,12 @@ export class AIService {
   }
 
   /**
-   * OCR / describe an image via Groq vision (multimodal Llama 4 Scout).
-   * `base64Image` must be under Groq's ~4MB base64 limit. No Gemini.
+   * OCR / describe an image via Groq vision (multimodal Qwen 3.6).
+   * `base64Image` must be under Groq's ~4MB base64 limit.
+   *
+   * Thinking is switched off: transcription needs none of it, and in Qwen's
+   * `raw` reasoning format the `<think>` block lands in `content` — i.e. inside
+   * the extracted text.
    */
   static async extractImageText(base64Image: string, mimeType: string): Promise<string> {
     const prompt =
@@ -199,7 +239,12 @@ export class AIService {
       this.groqPost({
         model: this.VISION_MODEL,
         temperature: 0.2,
-        max_tokens: 4000,
+        // Groq charges max_tokens against TPM up front, so this is a throughput
+        // knob, not just a ceiling. A dense A4 page transcribes to ~220 tokens
+        // measured; 1500 is ~7x that. Safe to keep tight because thinking is
+        // off above — only the transcript draws on it.
+        max_tokens: 1500,
+        reasoning_effort: 'none',
         messages: [
           {
             role: 'user',
@@ -346,14 +391,27 @@ export class AIService {
     count: number
   ): Promise<{ title?: string; questions: any[] }> {
     const prompt = buildQuizGenerationPrompt(content, { ...config, questionCount: count }, materialTitle, language)
-    // Scale the output budget to the question count (cap at Groq's limit).
+    // Scale the output budget to the question count. Groq bills `max_tokens`
+    // against TPM up front (prompt + max_tokens must clear the limit or the
+    // request is rejected 413), so this cap is a rate-limit ceiling, not a
+    // capability one — gpt-oss-120b itself will emit up to 65k.
     const maxTokens = Math.min(8000, 1200 + count * 260)
 
-    const raw = await this.complete(prompt, {
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      temperature: 0.7,
-      maxTokens,
-    })
+    let raw: string
+    try {
+      raw = await this.callGemini(prompt)
+    } catch (error) {
+      // Groq can only serve materials small enough that prompt + maxTokens
+      // clears its TPM ceiling; for larger ones this rethrows rather than
+      // quietly producing a quiz from a truncated view of the material.
+      console.log('Gemini quiz generation failed, trying Groq:', (error as Error)?.message)
+      raw = await this.complete(prompt, {
+        model: this.LARGE_MODEL,
+        temperature: 0.7,
+        maxTokens,
+        reasoningEffort: 'low',
+      })
+    }
 
     let title: string | undefined
     let rawQuestions: any[]
@@ -476,9 +534,13 @@ export class AIService {
       question.questionType
     )
     const raw = await this.complete(prompt, {
-      model: 'llama-3.1-8b-instant',
+      model: this.FAST_MODEL,
       temperature: 0.3,
-      maxTokens: 500,
+      // Verdict JSON plus thinking measures ~55 tokens; 800 leaves ~14x headroom
+      // while keeping this cheap enough to grade a quiz without tripping TPM
+      // (max_tokens is billed up front, so a fat budget throttles the user).
+      maxTokens: 800,
+      reasoningEffort: 'low',
     })
 
     try {
@@ -502,56 +564,25 @@ export class AIService {
     }
   }
 
-  /**
-   * Single-prompt JSON completion: Gemini primary (when configured), Groq
-   * fallback. Groq is used directly when Gemini is unconfigured.
-   */
+  /** Single-prompt JSON completion via Groq. */
   private static async complete(prompt: string, groqOpts: GroqOptions): Promise<string> {
-    if (process.env.GOOGLE_AI_API_KEY) {
-      try {
-        return await this.callGemini(prompt)
-      } catch (error) {
-        console.log('Gemini failed, falling back to Groq:', (error as Error)?.message)
-      }
-    }
     return this.callGroq([{ role: 'user', content: prompt }], { ...groqOpts, json: true })
   }
 
   /**
-   * Multi-turn free-text chat: Gemini primary (when configured), Groq fallback.
-   * Used for material chat and graph concept extraction.
+   * Multi-turn free-text chat via Groq. Used for material chat and graph
+   * concept extraction.
    */
   static async chat(
     messages: ChatMessage[],
     opts: Partial<GroqOptions> = {}
   ): Promise<string> {
     const groqOpts: GroqOptions = {
-      model: opts.model ?? 'llama-3.1-8b-instant',
+      model: opts.model ?? this.FAST_MODEL,
       temperature: opts.temperature ?? 0.5,
-      maxTokens: opts.maxTokens ?? 1000,
+      maxTokens: opts.maxTokens ?? 2000,
       json: false,
-    }
-
-    if (process.env.GOOGLE_AI_API_KEY) {
-      try {
-        return await this.withTimeout(
-          (async () => {
-            const model = this.getGeminiClient().getGenerativeModel({
-              model: 'gemini-2.0-flash',
-            })
-            const history = messages.slice(0, -1).map((m) => ({
-              role: m.role === 'assistant' ? 'model' : 'user',
-              parts: [{ text: m.content }],
-            }))
-            const chat = model.startChat({ history })
-            const result = await chat.sendMessage(messages[messages.length - 1].content)
-            return result.response.text()
-          })(),
-          this.TIMEOUT
-        )
-      } catch (error) {
-        console.log('Gemini chat failed, falling back to Groq:', (error as Error)?.message)
-      }
+      reasoningEffort: opts.reasoningEffort ?? 'low',
     }
 
     return this.callGroq(messages, groqOpts)
@@ -582,10 +613,13 @@ export class AIService {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: opts.model ?? 'llama-3.1-8b-instant',
+          model: opts.model ?? this.FAST_MODEL,
           messages,
           temperature: opts.temperature ?? 0.5,
-          max_tokens: opts.maxTokens ?? 1000,
+          max_tokens: opts.maxTokens ?? 2000,
+          // Thinking deltas arrive as `delta.reasoning` and are dropped by the
+          // reader below, but they still delay the first visible token.
+          reasoning_effort: opts.reasoningEffort ?? 'low',
           stream: true,
         }),
       })
