@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { ApiError } from '@/lib/api/errors'
 import { AIService } from './AIService'
 import type { Question, ReviewCard, ReviewGradeResult } from '@/lib/types'
 
@@ -195,8 +196,8 @@ export class ReviewService {
       db.from('questions').select('*').eq('id', questionId).single(),
     ])
 
-    if (!item) throw new Error('Review item not found')
-    if (!question) throw new Error('Question not found')
+    if (!item) throw new ApiError('Review item not found', 404)
+    if (!question) throw new ApiError('Question not found', 404)
 
     const formatted: Question = {
       id: question.id,

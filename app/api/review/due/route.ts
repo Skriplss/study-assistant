@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ReviewService } from '@/lib/services/ReviewService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { errorResponse } from '@/lib/api/response'
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,7 +33,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ cards, dueCount }, { status: 200 })
   } catch (error) {
     console.error('Load due reviews error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to load reviews'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return errorResponse(error, 'Failed to load reviews')
   }
 }

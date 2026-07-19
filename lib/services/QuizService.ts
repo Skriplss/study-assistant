@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { ApiError } from '@/lib/api/errors'
 import { AIService } from './AIService'
 import { AnalyticsService } from './AnalyticsService'
 import { ReviewService } from './ReviewService'
@@ -56,7 +57,7 @@ export class QuizService {
       .single()
 
     if (!material?.parsed_content) {
-      throw new Error('Material not parsed yet')
+      throw new ApiError('This material is still being processed. Try again once it finishes.', 409)
     }
 
     const quizData = await AIService.generateQuiz(
@@ -106,7 +107,7 @@ export class QuizService {
       .eq('id', quizId)
       .single()
 
-    if (error || !quiz) throw new Error('Quiz not found')
+    if (error || !quiz) throw new ApiError('Quiz not found', 404)
 
     // Questions and any existing answers are independent reads — run together.
     const [{ data: questions }, { data: answers }] = await Promise.all([
@@ -161,8 +162,8 @@ export class QuizService {
       db.from('questions').select('*').eq('id', questionId).single(),
     ])
 
-    if (!quiz || quiz.user_id !== userId) throw new Error('Quiz not found')
-    if (!question || question.quiz_id !== quizId) throw new Error('Question not found')
+    if (!quiz || quiz.user_id !== userId) throw new ApiError('Quiz not found', 404)
+    if (!question || question.quiz_id !== quizId) throw new ApiError('Question not found', 404)
 
     const questionFormatted = {
       id: question.id,

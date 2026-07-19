@@ -45,9 +45,14 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
         }),
       })
 
-      if (!res.ok) throw new Error('Failed to submit answer')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // Surface the server's friendly reason (e.g. "AI service is busy. Try
+        // again in 20 seconds.") rather than a generic fallback.
+        toast({ message: data.error || 'Failed to submit answer', variant: 'error' })
+        return
+      }
 
-      const data = await res.json()
       const answer: Answer = data.answer ?? data
       setAnswers(new Map(answers.set(currentQuestion.id, answer)))
     } catch {
@@ -101,7 +106,11 @@ export function QuizTaker({ quiz, onComplete }: QuizTakerProps) {
         method: 'POST',
       })
 
-      if (!res.ok) throw new Error('Failed to complete quiz')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast({ message: data.error || 'Failed to complete quiz', variant: 'error' })
+        return
+      }
 
       onComplete()
     } catch {

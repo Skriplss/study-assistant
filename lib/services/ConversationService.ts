@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { ApiError } from '@/lib/api/errors'
 import type { Json } from '@/lib/supabase/database.types'
 import type { ChatMessageRecord, ConversationSummary } from '@/lib/types'
 import type { ChatSource } from './GlobalChatService'
@@ -53,7 +54,7 @@ export class ConversationService {
       .eq('user_id', userId)
       .single()
 
-    if (!data) throw new Error('Conversation not found')
+    if (!data) throw new ApiError('Conversation not found', 404)
   }
 
   static async appendMessage(

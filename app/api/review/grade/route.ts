@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ReviewService } from '@/lib/services/ReviewService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { errorResponse } from '@/lib/api/response'
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,8 +35,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result, { status: 200 })
   } catch (error) {
     console.error('Grade review error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to grade review'
-    const status = message === 'Review item not found' ? 404 : 500
-    return NextResponse.json({ error: message }, { status })
+    return errorResponse(error, 'Failed to grade review')
   }
 }

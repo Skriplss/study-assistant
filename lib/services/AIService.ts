@@ -181,6 +181,10 @@ export class AIService {
 
     const retryAfter = this.parseRetryAfter(res.headers)
 
+    // 413 on Groq's free tier is a TPM ceiling (prompt + max_tokens billed up
+    // front), not a capability limit — surface it as "too large", not `unknown`,
+    // so it maps to a friendly message instead of leaking the raw provider text.
+    if (res.status === 413) return new AIServiceError(message, 'too_large', retryAfter)
     if (res.status === 429) {
       const isQuota = /quota|insufficient|billing/i.test(message)
       return new AIServiceError(message, isQuota ? 'quota' : 'rate_limit', retryAfter)

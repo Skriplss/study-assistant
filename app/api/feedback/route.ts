@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { isAdmin } from '@/lib/config/admin'
+import { errorResponse } from '@/lib/api/response'
 
 const TYPES = ['bug', 'idea', 'other'] as const
 const STATUSES = ['new', 'seen', 'resolved'] as const
@@ -41,9 +42,9 @@ export async function POST(request: NextRequest) {
     if (error) throw new Error(error.message)
 
     return NextResponse.json({ success: true }, { status: 201 })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Submit feedback error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return errorResponse(error, 'Failed to submit feedback')
   }
 }
 
@@ -62,9 +63,9 @@ export async function GET(request: NextRequest) {
     if (error) throw new Error(error.message)
 
     return NextResponse.json({ feedback: data ?? [] }, { status: 200 })
-  } catch (error: any) {
+  } catch (error) {
     console.error('List feedback error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return errorResponse(error, 'Failed to load feedback')
   }
 }
 
@@ -88,8 +89,8 @@ export async function PATCH(request: NextRequest) {
     if (error) throw new Error(error.message)
 
     return NextResponse.json({ success: true }, { status: 200 })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Update feedback error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return errorResponse(error, 'Failed to update feedback')
   }
 }

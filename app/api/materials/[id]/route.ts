@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { MaterialService } from '@/lib/services/MaterialService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { errorResponse } from '@/lib/api/response'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -61,8 +62,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ material }, { status: 200 })
   } catch (error) {
     console.error('Update material error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to update material'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return errorResponse(error, 'Failed to update material')
   }
 }
 
@@ -92,7 +92,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ message: 'Material deleted successfully' }, { status: 200 })
   } catch (error) {
     console.error('Delete material error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to delete material'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return errorResponse(error, 'Failed to delete material')
   }
 }

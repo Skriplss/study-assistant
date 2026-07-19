@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { MaterialParser } from '@/lib/services/MaterialParser'
 import { MaterialService } from '@/lib/services/MaterialService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { errorResponse } from '@/lib/api/response'
 
 export async function POST(request: NextRequest) {
   let _materialId: string | undefined = undefined
@@ -157,8 +158,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Parse material error:', error, { materialId: _materialId })
-    const message =
-      error instanceof Error ? error.message : 'Failed to parse material'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return errorResponse(error, 'Failed to parse material')
   }
 }

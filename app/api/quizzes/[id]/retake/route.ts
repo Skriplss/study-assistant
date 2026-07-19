@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { QuizService } from '@/lib/services/QuizService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { errorResponse } from '@/lib/api/response'
 
 export async function POST(
   request: NextRequest,
@@ -23,8 +24,8 @@ export async function POST(
     const quiz = await QuizService.retakeQuiz(user.id, id)
 
     return NextResponse.json({ quiz }, { status: 200 })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Retake quiz error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return errorResponse(error, 'Failed to restart quiz')
   }
 }

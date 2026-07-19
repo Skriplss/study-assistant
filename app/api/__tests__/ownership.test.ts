@@ -12,6 +12,7 @@
  */
 
 import { NextRequest } from 'next/server'
+import { ApiError } from '@/lib/api/errors'
 
 jest.mock('server-only', () => ({}))
 
@@ -106,13 +107,13 @@ describe('quizzes owned by someone else', () => {
   ]
 
   it.each(serviceGuarded)('%s passes the caller id to the service and surfaces its refusal', async (_name, path, serviceFn, body) => {
-    serviceFn.mockRejectedValue(new Error('Quiz not found'))
+    serviceFn.mockRejectedValue(new ApiError('Quiz not found', 404))
 
     const mod = require(path)
     const handler = mod.POST ?? mod.GET
     const response = await handler(request(body), ID_CTX)
 
-    expect(response.status).not.toBe(200)
+    expect(response.status).toBe(404)
     // The guard is only as good as the id it's given — assert we pass the
     // authenticated user, not something from the request body.
     expect(serviceFn).toHaveBeenCalledWith(ME, ...serviceFn.mock.calls[0].slice(1))
@@ -165,7 +166,7 @@ describe('materials owned by someone else', () => {
 describe('conversations owned by someone else', () => {
   it('GET /api/conversations/[id] 404s rather than revealing it exists', async () => {
     ;(ConversationService.getMessages as jest.Mock).mockRejectedValue(
-      new Error('Conversation not found')
+      new ApiError('Conversation not found', 404)
     )
 
     const { GET } = require('../conversations/[id]/route')
@@ -177,7 +178,7 @@ describe('conversations owned by someone else', () => {
 
   it('DELETE /api/conversations/[id] 404s for another user\'s thread', async () => {
     ;(ConversationService.remove as jest.Mock).mockRejectedValue(
-      new Error('Conversation not found')
+      new ApiError('Conversation not found', 404)
     )
 
     const { DELETE } = require('../conversations/[id]/route')
@@ -190,7 +191,7 @@ describe('conversations owned by someone else', () => {
 
 describe('review items owned by someone else', () => {
   it('POST /api/review/grade 404s for a question not scheduled for me', async () => {
-    ;(ReviewService.grade as jest.Mock).mockRejectedValue(new Error('Review item not found'))
+    ;(ReviewService.grade as jest.Mock).mockRejectedValue(new ApiError('Review item not found', 404))
 
     const { POST } = require('../review/grade/route')
     const response = await POST(request({ questionId: 'q1', userAnswer: 'x' }))

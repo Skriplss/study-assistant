@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { QuizService } from '@/lib/services/QuizService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { errorResponse } from '@/lib/api/response'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,8 +20,8 @@ export async function GET(request: NextRequest) {
     const quizzes = await QuizService.listQuizzes(user.id)
 
     return NextResponse.json({ quizzes }, { status: 200 })
-  } catch (error: any) {
+  } catch (error) {
     console.error('List quizzes error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return errorResponse(error, 'Failed to load quizzes')
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { QuizService } from '@/lib/services/QuizService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { errorResponse } from '@/lib/api/response'
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -29,8 +30,8 @@ export async function POST(
     const result = await QuizService.submitAnswer(user.id, id, questionId, answer)
 
     return NextResponse.json({ answer: result }, { status: 200 })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Submit answer error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return errorResponse(error, 'Failed to submit answer')
   }
 }

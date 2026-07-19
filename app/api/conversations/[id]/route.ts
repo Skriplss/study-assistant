@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ConversationService } from '@/lib/services/ConversationService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { errorResponse } from '@/lib/api/response'
 
 async function authenticate(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -15,9 +16,9 @@ async function authenticate(request: NextRequest) {
   return error || !user ? null : user
 }
 
-// "Conversation not found" is what the service throws for both a missing row and
-// someone else's — deliberately indistinguishable, so it maps to one 404.
-const statusFor = (message: string) => (message === 'Conversation not found' ? 404 : 500)
+// The service throws ApiError('Conversation not found', 404) for both a missing
+// row and someone else's — deliberately indistinguishable, so both map to 404
+// via errorResponse rather than revealing which case it was.
 
 export async function GET(
   request: NextRequest,
@@ -33,8 +34,7 @@ export async function GET(
     return NextResponse.json({ messages }, { status: 200 })
   } catch (error) {
     console.error('Load conversation error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to load conversation'
-    return NextResponse.json({ error: message }, { status: statusFor(message) })
+    return errorResponse(error, 'Failed to load conversation')
   }
 }
 
@@ -52,7 +52,6 @@ export async function DELETE(
     return NextResponse.json({ message: 'Conversation deleted' }, { status: 200 })
   } catch (error) {
     console.error('Delete conversation error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to delete conversation'
-    return NextResponse.json({ error: message }, { status: statusFor(message) })
+    return errorResponse(error, 'Failed to delete conversation')
   }
 }

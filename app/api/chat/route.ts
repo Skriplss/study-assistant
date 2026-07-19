@@ -4,6 +4,7 @@ import { AIService } from '@/lib/services/AIService'
 import { ConversationService } from '@/lib/services/ConversationService'
 import { GlobalChatService } from '@/lib/services/GlobalChatService'
 import { getUserFriendlyAIError } from '@/lib/ai/errors'
+import { errorResponse } from '@/lib/api/response'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -137,11 +138,8 @@ Instructions:
     })
 
     return new Response(stream, { headers: responseHeaders })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Global chat error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to process chat message' },
-      { status: 500 }
-    )
+    return errorResponse(error, 'Failed to process chat message')
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { QuizService } from '@/lib/services/QuizService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { errorResponse } from '@/lib/api/response'
 
 export async function GET(
   request: NextRequest,
@@ -27,8 +28,8 @@ export async function GET(
     }
 
     return NextResponse.json({ quiz }, { status: 200 })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Get quiz error:', error)
-    return NextResponse.json({ error: error.message }, { status: 404 })
+    return errorResponse(error, 'Quiz not found', 404)
   }
 }
