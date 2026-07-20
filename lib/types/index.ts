@@ -194,11 +194,6 @@ export interface Connection {
   sharedConcepts: string[]
 }
 
-export interface ConnectionDetails extends Connection {
-  material1: StudyMaterial
-  material2: StudyMaterial
-}
-
 // Analytics Types
 export interface ProgressData {
   totalMaterials: number
@@ -230,19 +225,6 @@ export interface CategoryPerformance {
   questionCount: number
 }
 
-export interface TopicAnalysis {
-  strengths: TopicScore[]
-  weaknesses: TopicScore[]
-  improving: TopicScore[]
-  declining: TopicScore[]
-}
-
-export interface TopicScore {
-  topic: string // tag or category
-  score: number
-  trend: number // positive or negative
-}
-
 // Search Types
 export interface SearchFilters {
   fileTypes?: ('pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg')[]
@@ -255,18 +237,4 @@ export interface SearchResult {
   relevanceScore: number
   matchedTerms: string[]
   snippet: string
-}
-
-// AI Service Types
-export interface GroqOptions {
-  model: string
-  temperature: number
-  maxTokens: number
-  timeout: number
-}
-
-export interface Concept {
-  term: string
-  frequency: number
-  importance: number
 }

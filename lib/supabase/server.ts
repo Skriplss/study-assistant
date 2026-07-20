@@ -31,10 +31,3 @@ export function getSupabaseAdmin(): SupabaseClient<Database> {
   }
   return adminClient
 }
-
-/** @deprecated Use getSupabaseAdmin() */
-export const supabaseAdmin = new Proxy({} as SupabaseClient<Database>, {
-  get(_target, prop) {
-    return Reflect.get(getSupabaseAdmin(), prop)
-  },
-})
