@@ -33,7 +33,7 @@ const nextConfig = {
       bodySizeLimit: '50mb',
     },
     // Optimize package imports
-    optimizePackageImports: ['reactflow', '@xyflow/react', 'recharts', 'groq-sdk'],
+    optimizePackageImports: ['react-force-graph-2d', 'recharts', 'groq-sdk'],
     // Increase middleware body size limit
     middlewareClientMaxBodySize: '100mb',
   },
