@@ -204,13 +204,7 @@ Return only a JSON array, e.g. ["concept a", "concept b"]`
       .select('material_id, tag')
       .in('material_id', materials.map(m => m.id))
 
-    const tagsByMaterial = new Map<string, string[]>()
-    allTags?.forEach(t => {
-      if (!tagsByMaterial.has(t.material_id)) {
-        tagsByMaterial.set(t.material_id, [])
-      }
-      tagsByMaterial.get(t.material_id)!.push(t.tag)
-    })
+    const tagsByMaterial = this.groupTags(allTags)
 
     const nodes: GraphNode[] = materials.map(m => ({
       id: m.id,

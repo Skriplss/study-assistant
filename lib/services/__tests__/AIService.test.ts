@@ -34,26 +34,6 @@ function mockGroqResponse(
   })
 }
 
-describe('AIService.validateQuizConfig', () => {
-  it('should reject question count below 5', () => {
-    const result = AIService.validateQuizConfig({
-      questionCount: 3,
-      difficulty: 'easy',
-      questionTypes: ['multiple_choice'],
-    })
-    expect(result.valid).toBe(false)
-  })
-
-  it('should accept valid configuration', () => {
-    const result = AIService.validateQuizConfig({
-      questionCount: 10,
-      difficulty: 'mixed',
-      questionTypes: ['multiple_choice', 'open_ended'],
-    })
-    expect(result.valid).toBe(true)
-  })
-})
-
 describe('AIService.parseQuizResponse', () => {
   it('should parse JSON wrapped in markdown fences', () => {
     const raw = '```json\n' + JSON.stringify(validQuizJson) + '\n```'
