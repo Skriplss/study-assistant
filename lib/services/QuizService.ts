@@ -7,6 +7,19 @@ import { AnalyticsService } from './AnalyticsService'
 import { ReviewService } from './ReviewService'
 import type { Quiz, QuizConfig, Answer, QuizResults, QuizSummary } from '@/lib/types'
 
+/** Map a DB answer row (snake_case) to an Answer. */
+function mapAnswer(a: any): Answer {
+  return {
+    id: a.id,
+    quizId: a.quiz_id,
+    questionId: a.question_id,
+    userAnswer: a.user_answer,
+    isCorrect: a.is_correct,
+    feedback: a.feedback,
+    answeredAt: a.answered_at || new Date().toISOString(),
+  }
+}
+
 export class QuizService {
   /** Quiz history, newest first. Skips questions/answers — the list needs neither. */
   static async listQuizzes(userId: string): Promise<QuizSummary[]> {
@@ -135,15 +148,7 @@ export class QuizService {
         explanation: q.explanation,
         orderIndex: q.order_index,
       })),
-      answers: (answers || []).map(a => ({
-        id: a.id,
-        quizId: a.quiz_id,
-        questionId: a.question_id,
-        userAnswer: a.user_answer,
-        isCorrect: a.is_correct,
-        feedback: a.feedback,
-        answeredAt: a.answered_at || new Date().toISOString(),
-      })),
+      answers: (answers || []).map(mapAnswer),
       completedAt: quiz.completed_at,
       createdAt: quiz.created_at || new Date().toISOString(),
     }
@@ -198,15 +203,7 @@ export class QuizService {
       await db.from('quizzes').update({ status: 'in_progress' }).eq('id', quizId)
     }
 
-    return {
-      id: answer.id,
-      quizId: answer.quiz_id,
-      questionId: answer.question_id,
-      userAnswer: answer.user_answer,
-      isCorrect: answer.is_correct,
-      feedback: answer.feedback,
-      answeredAt: new Date().toISOString(),
-    }
+    return mapAnswer(answer)
   }
 
   static async completeQuiz(userId: string, quizId: string): Promise<QuizResults> {
@@ -309,15 +306,7 @@ export class QuizService {
       score: quiz.score ?? 0,
       correctCount: rows.filter((a) => a.is_correct).length,
       totalQuestions: quiz.total_questions,
-      answers: rows.map((a) => ({
-        id: a.id,
-        quizId: a.quiz_id,
-        questionId: a.question_id,
-        userAnswer: a.user_answer,
-        isCorrect: a.is_correct,
-        feedback: a.feedback,
-        answeredAt: a.answered_at || new Date().toISOString(),
-      })),
+      answers: rows.map(mapAnswer),
       completedAt: quiz.completed_at || new Date().toISOString(),
     }
   }

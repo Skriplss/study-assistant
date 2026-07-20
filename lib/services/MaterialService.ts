@@ -1,10 +1,7 @@
 import 'server-only'
  
 import { getSupabaseAdmin } from '@/lib/supabase/server'
-import {
-  validateMaterialFile,
-  validateMaterialUpload,
-} from '@/lib/materials/file-validation'
+import { validateMaterialUpload } from '@/lib/materials/file-validation'
 import type { StudyMaterial, MaterialMetadata } from '@/lib/types'
 
 type FileType = StudyMaterial['fileType']
@@ -22,6 +19,10 @@ export class MaterialValidationError extends Error {
   }
 }
  
+function tagRows(materialId: string, tags: string[]) {
+  return tags.map((tag) => ({ material_id: materialId, tag: tag.trim().toLowerCase() }))
+}
+
 function mapMaterial(material: any, tags: string[]): StudyMaterial {
   return {
     id: material.id,
@@ -45,11 +46,7 @@ function mapMaterial(material: any, tags: string[]): StudyMaterial {
  
 export class MaterialService {
   private static readonly STORAGE_BUCKET = 'study-materials'
- 
-  static validateFile(file: File): { valid: boolean; error?: string } {
-    return validateMaterialFile(file)
-  }
- 
+
   /**
    * Reserve a storage path and hand the browser a signed URL to upload to directly.
    * Bytes must never transit the API route: Vercel rejects request bodies over 4.5MB
@@ -164,11 +161,7 @@ export class MaterialService {
     }
 
     if (metadata.tags && metadata.tags.length > 0) {
-      const tagData = metadata.tags.map((tag) => ({
-        material_id: materialId,
-        tag: tag.trim().toLowerCase(),
-      }))
-      await db.from('material_tags').insert(tagData)
+      await db.from('material_tags').insert(tagRows(materialId, metadata.tags))
     }
 
     return this.getMaterial(materialId)
@@ -208,11 +201,7 @@ export class MaterialService {
     }
 
     if (metadata.tags && metadata.tags.length > 0) {
-      const tagData = metadata.tags.map((tag) => ({
-        material_id: materialId,
-        tag: tag.trim().toLowerCase(),
-      }))
-      await db.from('material_tags').insert(tagData)
+      await db.from('material_tags').insert(tagRows(materialId, metadata.tags))
     }
 
     return this.getMaterial(materialId)
@@ -306,11 +295,9 @@ export class MaterialService {
       await db.from('material_tags').delete().eq('material_id', materialId)
  
       if (updates.tags.length > 0) {
-        const tagData = updates.tags.map((tag) => ({
-          material_id: materialId,
-          tag: tag.trim().toLowerCase(),
-        }))
-        const { error: tagError } = await db.from('material_tags').insert(tagData)
+        const { error: tagError } = await db
+          .from('material_tags')
+          .insert(tagRows(materialId, updates.tags))
         if (tagError) {
           throw new Error(`Failed to insert tags: ${tagError.message}`)
         }
