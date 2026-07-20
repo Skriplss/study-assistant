@@ -31,26 +31,19 @@ export class GraphService {
       .select('material_id, tag')
       .in('material_id', materials.map(m => m.id))
 
-    const tagsByMaterial = new Map<string, string[]>()
-    allTags?.forEach(t => {
-      if (!tagsByMaterial.has(t.material_id)) {
-        tagsByMaterial.set(t.material_id, [])
-      }
-      tagsByMaterial.get(t.material_id)!.push(t.tag)
-    })
+    const tagsByMaterial = this.groupTags(allTags)
 
-    // Extract each material's concepts ONCE (n AI calls, bounded concurrency),
-    // then compute pairwise overlap in code. The old approach ran one AI call
-    // per pair — n(n-1)/2 sequential requests, which timed out at any scale.
-    // Sequential, not concurrent: Groq's free tier is ~6000 tokens/minute
-    // (shared across the whole org), so parallel extractions just trigger 429
-    // storms that burn the retry budget and return empty concept sets. One at a
-    // time lets the token bucket refill between calls.
+    // Extract each material's concepts ONCE, then compute pairwise overlap in
+    // code. The old approach ran one AI call per pair — n(n-1)/2 requests, which
+    // timed out at any scale. Sequential, not concurrent: Groq's free tier is
+    // ~6000 tokens/minute (shared across the whole org), so parallel extractions
+    // just trigger 429 storms that burn the retry budget and return empty
+    // concept sets. One at a time lets the token bucket refill between calls.
     const withContent = materials.filter((m) => m.parsed_content)
     const conceptsById = new Map<string, string[]>()
-    await this.mapLimit(withContent, 1, async (m) => {
+    for (const m of withContent) {
       conceptsById.set(m.id, await this.extractConcepts(m.parsed_content as string, m.title))
-    })
+    }
 
     const connections: {
       user_id: string
@@ -93,19 +86,16 @@ export class GraphService {
     }
   }
 
-  /** Run an async fn over items with a bounded number of concurrent workers. */
-  private static async mapLimit<T>(
-    items: T[],
-    limit: number,
-    fn: (item: T) => Promise<void>
-  ): Promise<void> {
-    let cursor = 0
-    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (cursor < items.length) {
-        await fn(items[cursor++])
-      }
+  /** Group tag rows into a materialId → tags[] map. */
+  private static groupTags(
+    rows: { material_id: string; tag: string }[] | null
+  ): Map<string, string[]> {
+    const byMaterial = new Map<string, string[]>()
+    rows?.forEach((t) => {
+      if (!byMaterial.has(t.material_id)) byMaterial.set(t.material_id, [])
+      byMaterial.get(t.material_id)!.push(t.tag)
     })
-    await Promise.all(workers)
+    return byMaterial
   }
 
   /** Extract a normalized set of key concepts for one material (single AI call). */
