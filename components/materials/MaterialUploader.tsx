@@ -44,37 +44,28 @@ export default function MaterialUploader({
     setIsDragging(false)
   }, [])
 
+  const acceptFile = useCallback((f: File) => {
+    const validation = validateMaterialFile(f)
+    if (!validation.valid) {
+      setError(validation.error || 'Invalid file')
+      return
+    }
+    setFile(f)
+    setTitle(f.name.replace(/\.[^/.]+$/, '')) // title tracks filename
+  }, [])
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
     setError('')
-
     const droppedFile = e.dataTransfer.files[0]
-    if (droppedFile) {
-      const validation = validateMaterialFile(droppedFile)
-      if (!validation.valid) {
-        setError(validation.error || 'Invalid file')
-        return
-      }
-      setFile(droppedFile)
-      // Always update title from filename
-      setTitle(droppedFile.name.replace(/\.[^/.]+$/, ''))
-    }
-  }, [])
+    if (droppedFile) acceptFile(droppedFile)
+  }, [acceptFile])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('')
     const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      const validation = validateMaterialFile(selectedFile) // ✅ уже импортирован
-      if (!validation.valid) {
-        setError(validation.error || 'Invalid file')
-        return
-      }
-      setFile(selectedFile)
-      // Always update title from filename
-      setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''))
-    }
+    if (selectedFile) acceptFile(selectedFile)
   }
   
   const handleUpload = async () => {
@@ -239,11 +230,6 @@ export default function MaterialUploader({
       setIsUploading(false)
     }
   }
-
-  const handleRetry = () => {
-  setError('')
-  handleUpload()
-}
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
@@ -429,16 +415,8 @@ export default function MaterialUploader({
 
       {/* Error Message */}
       {error && (
-        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm flex justify-between items-center">
-          <span>{error}</span>
-          {isUploading && (
-            <button
-              onClick={handleRetry}
-              className="underline hover:no-underline font-medium"
-            >
-              Retry
-            </button>
-          )}
+        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm">
+          {error}
         </div>
       )}
 

@@ -96,12 +96,17 @@ export class SearchService {
     return results.sort((a, b) => b.relevanceScore - a.relevanceScore)
   }
 
+  /** Significant search terms (>2 chars) from a raw query. */
+  private static queryTerms(query: string): string[] {
+    return query.toLowerCase().split(' ').filter((t) => t.length > 2)
+  }
+
   private static calculateRelevance(
     material: StudyMaterial,
     query: string,
     filters?: SearchFilters
   ): number {
-    const terms = query.toLowerCase().split(' ').filter(t => t.length > 2)
+    const terms = this.queryTerms(query)
     let score = 0
 
     const title = material.title.toLowerCase()
@@ -123,7 +128,7 @@ export class SearchService {
   }
 
   private static extractMatchedTerms(material: StudyMaterial, query: string): string[] {
-    const terms = query.toLowerCase().split(' ').filter(t => t.length > 2)
+    const terms = this.queryTerms(query)
     const matched: string[] = []
 
     const title = material.title.toLowerCase()
@@ -142,7 +147,7 @@ export class SearchService {
 
   private static generateSnippet(material: StudyMaterial, query: string): string {
     const content = material.parsedContent || material.title
-    const terms = query.toLowerCase().split(' ').filter(t => t.length > 2)
+    const terms = this.queryTerms(query)
     
     for (const term of terms) {
       const index = content.toLowerCase().indexOf(term)

@@ -18,7 +18,7 @@ interface ToastInput {
 }
 
 interface ToastContextValue {
-  toast: (input: ToastInput | string) => void
+  toast: (input: ToastInput) => void
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null)
@@ -44,9 +44,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const toast = useCallback(
-    (input: ToastInput | string) => {
-      const normalized: ToastInput = typeof input === 'string' ? { message: input } : input
-      const { message, variant = 'default', duration = 4000 } = normalized
+    (input: ToastInput) => {
+      const { message, variant = 'default', duration = 4000 } = input
       const id = (idRef.current += 1)
       setToasts(prev => [...prev, { id, message, variant }])
       setTimeout(() => remove(id), duration)

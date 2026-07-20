@@ -9,7 +9,7 @@ export interface ChatSource {
   title: string
 }
 
-export interface ChatContext {
+interface ChatContext {
   context: string
   sources: ChatSource[]
 }

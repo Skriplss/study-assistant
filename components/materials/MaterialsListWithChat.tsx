@@ -14,6 +14,13 @@ type FilterStatus = 'all' | 'completed' | 'pending' | 'failed'
 type FilterFileType = 'all' | 'pdf' | 'txt' | 'pptx' | 'image' | 'youtube' | 'url'
 type GroupBy = 'none' | 'category' | 'fileType' | 'date'
 
+// Which parsingStatus values each filter accepts ('all' has no entry — it skips the check).
+const STATUS_MATCH: Record<Exclude<FilterStatus, 'all'>, string[]> = {
+  completed: ['completed'],
+  pending: ['pending', 'processing'],
+  failed: ['failed'],
+}
+
 /**
  * SearchService drops query terms of 2 characters or fewer (the trigram index
  * needs 3), so a short query would come back empty rather than unfiltered.
@@ -163,16 +170,8 @@ export default function MaterialsListWithChat() {
     }
 
     return matched.filter((m) => {
-      if (statusFilter !== 'all') {
-        const statusMap: Record<FilterStatus, string[]> = {
-          all: [],
-          completed: ['completed'],
-          pending: ['pending', 'processing'],
-          failed: ['failed'],
-        }
-        if (!statusMap[statusFilter].includes(m.parsingStatus)) {
-          return false
-        }
+      if (statusFilter !== 'all' && !STATUS_MATCH[statusFilter].includes(m.parsingStatus)) {
+        return false
       }
 
       if (fileTypeFilter !== 'all') {

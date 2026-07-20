@@ -172,14 +172,6 @@ export class MaterialParser {
         })
       }
 
-      // Extract code blocks
-      const codeBlocks: string[] = []
-      const codeRegex = /```[\s\S]*?```/g
-      let codeMatch
-      while ((codeMatch = codeRegex.exec(markdownText)) !== null) {
-        codeBlocks.push(codeMatch[0])
-      }
-
       const lines = markdownText.split('\n')
       const paragraphs = cleanedText.split('\n\n').filter(p => p.length > 0)
 
@@ -191,8 +183,6 @@ export class MaterialParser {
             lineCount: lines.length,
             paragraphCount: paragraphs.length,
             headers,
-            codeBlockCount: codeBlocks.length,
-            rawMarkdown: markdownText,
           },
         },
       }
