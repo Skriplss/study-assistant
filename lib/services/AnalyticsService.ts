@@ -123,83 +123,49 @@ export class AnalyticsService {
     }))
   }
 
-  private static async getPerformanceByTag(
+  private static getPerformanceByTag(userId: string, startDate: Date): Promise<TagPerformance[]> {
+    return this.getPerformance('get_performance_by_tag', 'tag', userId, startDate)
+  }
+
+  private static getPerformanceByCategory(
     userId: string,
     startDate: Date
-  ): Promise<TagPerformance[]> {
+  ): Promise<CategoryPerformance[]> {
+    return this.getPerformance('get_performance_by_category', 'category', userId, startDate)
+  }
+
+  private static async getPerformance<K extends 'tag' | 'category'>(
+    rpc: 'get_performance_by_tag' | 'get_performance_by_category',
+    keyField: K,
+    userId: string,
+    startDate: Date
+  ): Promise<Array<Record<K, string> & { averageScore: number; quizCount: number; questionCount: number }>> {
     const db = getSupabaseAdmin()
 
-    const { data, error } = await db.rpc('get_performance_by_tag', {
+    const { data, error } = await db.rpc(rpc, {
       p_user_id: userId,
       p_start_date: startDate.toISOString(),
     })
 
     // An empty breakdown and a broken RPC look identical to the caller, which is
-    // how a 42703 in this function went unnoticed for its whole life. Log it.
+    // how a 42703 in one of these went unnoticed for its whole life. Log it.
     if (error) {
-      console.error('get_performance_by_tag failed:', error)
+      console.error(`${rpc} failed:`, error)
       return []
     }
 
     if (!data) return []
 
-    return data.map((row: {
-      tag: string
-      average_score: number
-      quiz_count: number
-      question_count: number
-    }) => ({
-      tag: row.tag,
+    return (data as any[]).map((row) => ({
+      [keyField]: row[keyField],
       averageScore: row.average_score,
       quizCount: row.quiz_count,
       questionCount: row.question_count,
-    }))
-  }
-
-  private static async getPerformanceByCategory(
-    userId: string,
-    startDate: Date
-  ): Promise<CategoryPerformance[]> {
-    const db = getSupabaseAdmin()
-
-    const { data, error } = await db.rpc('get_performance_by_category', {
-      p_user_id: userId,
-      p_start_date: startDate.toISOString(),
-    })
-
-    if (error) {
-      console.error('get_performance_by_category failed:', error)
-      return []
-    }
-
-    if (!data) return []
-
-    return data.map((row: {
-      category: string
-      average_score: number
-      quiz_count: number
-      question_count: number
-    }) => ({
-      category: row.category,
-      averageScore: row.average_score,
-      quizCount: row.quiz_count,
-      questionCount: row.question_count,
-    }))
+    })) as Array<Record<K, string> & { averageScore: number; quizCount: number; questionCount: number }>
   }
 
   private static getStartDate(range: string): Date {
-    const now = new Date()
-    switch (range) {
-      case '7d':
-        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      case '30d':
-        return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      case '90d':
-        return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-      case '1y':
-        return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
-      default:
-        return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    }
+    const days = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 }[range] ?? 30
+    return new Date(Date.now() - days * 86_400_000)
   }
 }

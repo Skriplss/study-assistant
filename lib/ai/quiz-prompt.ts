@@ -9,11 +9,6 @@ const SAMPLE_SEGMENTS = 6
 // this and are passed in full; only truly huge docs get sampled.
 const QUIZ_MAX_CONTENT_CHARS = 100_000
 
-export function truncateContent(content: string): string {
-  if (content.length <= MAX_CONTENT_CHARS) return content
-  return `${content.slice(0, MAX_CONTENT_CHARS)}\n\n[Content truncated]`
-}
-
 /**
  * Fit content into the prompt budget. For oversized material, sample several
  * evenly-spaced windows spanning the whole document (head → tail) instead of

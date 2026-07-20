@@ -3,27 +3,7 @@
 import { useTheme } from '@/lib/contexts/ThemeContext'
 
 export function ThemeToggle() {
-  // Safely handle case where ThemeProvider might not be available
-  let theme: 'light' | 'dark' = 'light'
-  let toggleTheme = () => {}
-
-  try {
-    const context = useTheme()
-    theme = context.theme
-    toggleTheme = context.toggleTheme
-  } catch {
-    // ThemeProvider not available, use manual theme switching
-    if (typeof window !== 'undefined') {
-      theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-      toggleTheme = () => {
-        const newTheme = theme === 'light' ? 'dark' : 'light'
-        document.documentElement.classList.remove('light', 'dark')
-        document.documentElement.classList.add(newTheme)
-        localStorage.setItem('theme', newTheme)
-        window.location.reload()
-      }
-    }
-  }
+  const { theme, toggleTheme } = useTheme()
 
   return (
     <button

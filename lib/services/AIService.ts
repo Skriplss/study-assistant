@@ -36,7 +36,6 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 export class AIService {
   static readonly MAX_RETRIES = 3
   static readonly TIMEOUT = 45000
-  static readonly RETRY_DELAYS = [1000, 2000, 4000]
   static readonly MIN_QUESTIONS = 5
   static readonly MAX_QUESTIONS = 50
   /** Groq's only vision-capable model since llama-4-scout was retired. */
@@ -213,7 +212,7 @@ export class AIService {
         const retryAfter =
           error instanceof AIServiceError && error.retryAfterSeconds
             ? error.retryAfterSeconds * 1000
-            : this.RETRY_DELAYS[i]
+            : 1000 * 2 ** i
         console.log(
           `Groq ${code}, retrying in ${retryAfter}ms (attempt ${i + 1}/${this.MAX_RETRIES})`
         )
@@ -335,22 +334,6 @@ export class AIService {
       }
     }
     return objects
-  }
-
-  static validateQuizConfig(config: QuizConfig): { valid: boolean; errors: string[] } {
-    const errors: string[] = []
-
-    if (config.questionCount < this.MIN_QUESTIONS) {
-      errors.push(`Question count must be at least ${this.MIN_QUESTIONS}`)
-    }
-    if (config.questionCount > this.MAX_QUESTIONS) {
-      errors.push(`Question count must be at most ${this.MAX_QUESTIONS}`)
-    }
-    if (!config.questionTypes || config.questionTypes.length === 0) {
-      errors.push('At least one question type is required')
-    }
-
-    return { valid: errors.length === 0, errors }
   }
 
   /** Drop questions that fail quality checks; returns the survivors. */
