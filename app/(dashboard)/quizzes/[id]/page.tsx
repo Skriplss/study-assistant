@@ -6,7 +6,7 @@ import { QuizTaker } from '@/components/quizzes/QuizTaker'
 import { QuizResults } from '@/components/quizzes/QuizResults'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
-import { Spinner } from '@/components/ui/Spinner'
+import { Skeleton } from '@/components/ui/Skeleton'
 import type { Quiz, QuizResults as Results } from '@/lib/types'
 
 export default function QuizPage() {
@@ -73,10 +73,21 @@ export default function QuizPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <Spinner size="lg" className="mx-auto mb-4 text-primary" />
-          <p className="font-medium text-muted-foreground">Loading quiz...</p>
+      <div className="min-h-screen bg-background py-8">
+        <div className="mx-auto max-w-7xl px-4">
+          <div className="mb-8 rounded-xl border border-border bg-card p-6 shadow-lg">
+            <Skeleton className="mb-4 h-9 w-1/3" />
+            <div className="flex gap-3">
+              <Skeleton className="h-8 w-20 rounded-full" />
+              <Skeleton className="h-8 w-28 rounded-full" />
+            </div>
+          </div>
+          <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-border bg-card p-8 shadow-lg">
+            <Skeleton className="h-7 w-2/3" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
         </div>
       </div>
     )

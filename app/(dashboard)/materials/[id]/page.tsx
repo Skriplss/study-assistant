@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import type { StudyMaterial } from '@/lib/types'
 import MaterialCard from '@/components/materials/MaterialCard'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 export default function MaterialDetailPage() {
   const params = useParams()
@@ -87,17 +88,29 @@ export default function MaterialDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <p className="text-muted-foreground">Loading…</p>
+      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="space-y-3">
+          <Skeleton className="h-9 w-1/3" />
+          <Skeleton className="h-4 w-1/4" />
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
       </div>
     )
   }
 
   if (error && !material) {
     return (
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-4">
+      <div className="mx-auto w-full max-w-7xl space-y-4 px-4 py-8 sm:px-6 lg:px-8">
         <p className="text-destructive">{error}</p>
-        <Link href="/materials" className="text-primary hover:underline inline-block">
+        <Link
+          href="/materials"
+          className="inline-block text-primary hover:underline"
+        >
           Back to materials
         </Link>
       </div>
@@ -107,8 +120,11 @@ export default function MaterialDetailPage() {
   if (!material) return null
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <Link href="/materials" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+      <Link
+        href="/materials"
+        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+      >
         ← Back to materials
       </Link>
 
@@ -128,7 +144,7 @@ export default function MaterialDetailPage() {
             type="button"
             onClick={handleParse}
             disabled={isParsing}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm font-medium"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {isParsing ? 'Parsing…' : 'Parse file'}
           </button>
@@ -139,7 +155,7 @@ export default function MaterialDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href={`/chat?material=${material.id}`}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium inline-flex items-center gap-1"
+            className="inline-flex items-center gap-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             💬 Chat about this
           </Link>
@@ -147,21 +163,24 @@ export default function MaterialDetailPage() {
       )}
 
       {material.parsingStatus === 'completed' && material.parsedContent && (
-        <section className="border border-border rounded-lg p-6 bg-card">
-          <h2 className="font-semibold text-lg mb-4">Extracted content preview</h2>
+        <section className="rounded-lg border border-border bg-card p-6">
+          <h2 className="mb-4 text-lg font-semibold">
+            Extracted content preview
+          </h2>
           <div className="prose prose-sm dark:prose-invert max-w-none">
-            <div className="text-sm text-foreground leading-relaxed space-y-2">
+            <div className="space-y-2 text-sm leading-relaxed text-foreground">
               {material.parsedContent
                 .split('\n\n')
                 .slice(0, 5)
                 .map((paragraph, idx) => (
-                  <p key={idx} className="text-foreground line-clamp-3">
+                  <p key={idx} className="line-clamp-3 text-foreground">
                     {paragraph}
                   </p>
                 ))}
               {material.parsedContent.split('\n\n').length > 5 && (
-                <p className="text-muted-foreground italic">
-                  ... and {material.parsedContent.split('\n\n').length - 5} more paragraphs
+                <p className="italic text-muted-foreground">
+                  ... and {material.parsedContent.split('\n\n').length - 5} more
+                  paragraphs
                 </p>
               )}
             </div>
@@ -170,7 +189,7 @@ export default function MaterialDetailPage() {
       )}
 
       {error && (
-        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4">
           <p className="text-sm text-destructive" role="alert">
             {error}
           </p>

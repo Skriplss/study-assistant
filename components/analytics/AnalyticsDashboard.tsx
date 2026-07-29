@@ -4,13 +4,31 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from 'recharts'
-import { Spinner } from '@/components/ui/Spinner'
+import { Skeleton } from '@/components/ui/Skeleton'
 import type { ProgressData } from '@/lib/types'
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+const COLORS = [
+  '#3b82f6',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#ec4899',
+]
 
 export function AnalyticsDashboard() {
   const { session } = useAuth()
@@ -27,7 +45,10 @@ export function AnalyticsDashboard() {
     if (!session) return
     setLoading(true)
     try {
-      const res = await fetchWithAuth(session, `/api/analytics/progress?range=${timeRange}`)
+      const res = await fetchWithAuth(
+        session,
+        `/api/analytics/progress?range=${timeRange}`
+      )
       if (res.ok) {
         const progressData = await res.json()
         setData(progressData)
@@ -40,10 +61,17 @@ export function AnalyticsDashboard() {
   }
 
   const scoreChartData = useMemo(() => {
-    const byDay = new Map<string, { key: number; label: string; sum: number; count: number }>()
+    const byDay = new Map<
+      string,
+      { key: number; label: string; sum: number; count: number }
+    >()
     for (const s of data?.scoreHistory ?? []) {
       const d = new Date(s.date)
-      const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+      const dayKey = new Date(
+        d.getFullYear(),
+        d.getMonth(),
+        d.getDate()
+      ).getTime()
       const entry = byDay.get(String(dayKey))
       if (entry) {
         entry.sum += s.score
@@ -59,7 +87,7 @@ export function AnalyticsDashboard() {
     }
     return Array.from(byDay.values())
       .sort((a, b) => a.key - b.key)
-      .map(e => ({
+      .map((e) => ({
         date: e.label,
         score: Math.round(e.sum / e.count),
         quizzes: e.count,
@@ -68,7 +96,7 @@ export function AnalyticsDashboard() {
 
   const tagChartData = useMemo(
     () =>
-      (data?.performanceByTag ?? []).slice(0, 10).map(t => ({
+      (data?.performanceByTag ?? []).slice(0, 10).map((t) => ({
         name: t.tag,
         score: Math.round(t.averageScore),
         count: t.quizCount,
@@ -78,7 +106,7 @@ export function AnalyticsDashboard() {
 
   const categoryChartData = useMemo(
     () =>
-      (data?.performanceByCategory ?? []).map(c => ({
+      (data?.performanceByCategory ?? []).map((c) => ({
         name: c.category,
         value: Math.round(c.averageScore),
       })),
@@ -87,15 +115,36 @@ export function AnalyticsDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Spinner size="lg" className="text-primary" />
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-border bg-card p-6"
+            >
+              <Skeleton className="mb-4 h-4 w-1/2" />
+              <Skeleton className="h-8 w-3/4" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-border bg-card p-6"
+            >
+              <Skeleton className="mb-4 h-4 w-1/3" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
   if (!data) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-muted-foreground">No analytics data available</p>
       </div>
     )
@@ -103,12 +152,16 @@ export function AnalyticsDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-        <h2 className="text-2xl font-bold text-foreground">Analytics Dashboard</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-2xl font-bold text-foreground">
+          Analytics Dashboard
+        </h2>
         <select
           value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
-          className="w-full sm:w-auto px-4 py-2 border-2 border-border bg-card text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          onChange={(e) =>
+            setTimeRange(e.target.value as '7d' | '30d' | '90d' | '1y')
+          }
+          className="w-full rounded-lg border-2 border-border bg-card px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary sm:w-auto"
         >
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>
@@ -117,31 +170,52 @@ export function AnalyticsDashboard() {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
-          <div className="text-sm text-muted-foreground font-medium">Total Materials</div>
-          <div className="text-3xl font-bold text-foreground mt-2">{data.totalMaterials}</div>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-lg sm:p-6">
+          <div className="text-sm font-medium text-muted-foreground">
+            Total Materials
+          </div>
+          <div className="mt-2 text-3xl font-bold text-foreground">
+            {data.totalMaterials}
+          </div>
         </div>
-        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
-          <div className="text-sm text-muted-foreground font-medium">Total Quizzes</div>
-          <div className="text-3xl font-bold text-foreground mt-2">{data.totalQuizzes}</div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-lg sm:p-6">
+          <div className="text-sm font-medium text-muted-foreground">
+            Total Quizzes
+          </div>
+          <div className="mt-2 text-3xl font-bold text-foreground">
+            {data.totalQuizzes}
+          </div>
         </div>
-        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
-          <div className="text-sm text-muted-foreground font-medium">Total Questions</div>
-          <div className="text-3xl font-bold text-foreground mt-2">{data.totalQuestions}</div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-lg sm:p-6">
+          <div className="text-sm font-medium text-muted-foreground">
+            Total Questions
+          </div>
+          <div className="mt-2 text-3xl font-bold text-foreground">
+            {data.totalQuestions}
+          </div>
         </div>
-        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
-          <div className="text-sm text-muted-foreground font-medium">Average Score</div>
-          <div className="text-3xl font-bold text-primary mt-2">{data.averageScore}%</div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-lg sm:p-6">
+          <div className="text-sm font-medium text-muted-foreground">
+            Average Score
+          </div>
+          <div className="mt-2 text-3xl font-bold text-primary">
+            {data.averageScore}%
+          </div>
         </div>
       </div>
 
       {scoreChartData.length > 0 && (
-        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Score History</h3>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-lg sm:p-6">
+          <h3 className="mb-4 text-lg font-semibold text-foreground">
+            Score History
+          </h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={scoreChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="rgb(var(--border))"
+              />
               <XAxis dataKey="date" stroke="rgb(var(--muted-foreground))" />
               <YAxis domain={[0, 100]} stroke="rgb(var(--muted-foreground))" />
               <Tooltip
@@ -149,7 +223,7 @@ export function AnalyticsDashboard() {
                   backgroundColor: 'rgb(var(--card))',
                   border: '1px solid rgb(var(--border))',
                   borderRadius: '8px',
-                  color: 'rgb(var(--foreground))'
+                  color: 'rgb(var(--foreground))',
                 }}
                 formatter={(value: number, _name, props) => [
                   `${value}%${props.payload.quizzes > 1 ? ` (avg of ${props.payload.quizzes} quizzes)` : ''}`,
@@ -157,18 +231,28 @@ export function AnalyticsDashboard() {
                 ]}
               />
               <Legend />
-              <Line type="monotone" dataKey="score" stroke="rgb(var(--primary))" strokeWidth={3} />
+              <Line
+                type="monotone"
+                dataKey="score"
+                stroke="rgb(var(--primary))"
+                strokeWidth={3}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
       )}
 
       {tagChartData.length > 0 && (
-        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Performance by Tag</h3>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-lg sm:p-6">
+          <h3 className="mb-4 text-lg font-semibold text-foreground">
+            Performance by Tag
+          </h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={tagChartData} margin={{ bottom: 24 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="rgb(var(--border))"
+              />
               <XAxis
                 dataKey="name"
                 stroke="rgb(var(--muted-foreground))"
@@ -178,14 +262,18 @@ export function AnalyticsDashboard() {
                 height={60}
                 tick={{ fontSize: 11 }}
               />
-              <YAxis domain={[0, 100]} stroke="rgb(var(--muted-foreground))" width={32} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'rgb(var(--card))', 
+              <YAxis
+                domain={[0, 100]}
+                stroke="rgb(var(--muted-foreground))"
+                width={32}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgb(var(--card))',
                   border: '1px solid rgb(var(--border))',
                   borderRadius: '8px',
-                  color: 'rgb(var(--foreground))'
-                }} 
+                  color: 'rgb(var(--foreground))',
+                }}
               />
               <Legend />
               <Bar dataKey="score" fill="rgb(var(--primary))" />
@@ -195,8 +283,10 @@ export function AnalyticsDashboard() {
       )}
 
       {categoryChartData.length > 0 && (
-        <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Performance by Category</h3>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-lg sm:p-6">
+          <h3 className="mb-4 text-lg font-semibold text-foreground">
+            Performance by Category
+          </h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -210,16 +300,19 @@ export function AnalyticsDashboard() {
                 dataKey="value"
               >
                 {categoryChartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                  />
                 ))}
               </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'rgb(var(--card))', 
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgb(var(--card))',
                   border: '1px solid rgb(var(--border))',
                   borderRadius: '8px',
-                  color: 'rgb(var(--foreground))'
-                }} 
+                  color: 'rgb(var(--foreground))',
+                }}
               />
             </PieChart>
           </ResponsiveContainer>

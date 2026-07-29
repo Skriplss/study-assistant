@@ -8,10 +8,18 @@ import type { SearchResult, StudyMaterial } from '@/lib/types'
 import MaterialCard from './MaterialCard'
 import MaterialUploader from './MaterialUploader'
 import { Modal } from '@/components/ui/Modal'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { cn } from '@/lib/utils/cn'
 
 type FilterStatus = 'all' | 'completed' | 'pending' | 'failed'
-type FilterFileType = 'all' | 'pdf' | 'txt' | 'pptx' | 'image' | 'youtube' | 'url'
+type FilterFileType =
+  | 'all'
+  | 'pdf'
+  | 'txt'
+  | 'pptx'
+  | 'image'
+  | 'youtube'
+  | 'url'
 type GroupBy = 'none' | 'category' | 'fileType' | 'date'
 
 // Which parsingStatus values each filter accepts ('all' has no entry — it skips the check).
@@ -28,7 +36,10 @@ const STATUS_MATCH: Record<Exclude<FilterStatus, 'all'>, string[]> = {
  * which also reaches parsed content and tags.
  */
 const hasServerSearchableTerm = (query: string) =>
-  query.trim().split(/\s+/).some(term => term.length > 2)
+  query
+    .trim()
+    .split(/\s+/)
+    .some((term) => term.length > 2)
 
 export default function MaterialsListWithChat() {
   const { session } = useAuth()
@@ -104,7 +115,7 @@ export default function MaterialsListWithChat() {
         }
 
         const results: SearchResult[] = await response.json()
-        if (!cancelled) setSearchRanking(results.map(r => r.material.id))
+        if (!cancelled) setSearchRanking(results.map((r) => r.material.id))
       } catch {
         if (!cancelled) setSearchRanking(null)
       } finally {
@@ -170,7 +181,10 @@ export default function MaterialsListWithChat() {
     }
 
     return matched.filter((m) => {
-      if (statusFilter !== 'all' && !STATUS_MATCH[statusFilter].includes(m.parsingStatus)) {
+      if (
+        statusFilter !== 'all' &&
+        !STATUS_MATCH[statusFilter].includes(m.parsingStatus)
+      ) {
         return false
       }
 
@@ -203,7 +217,10 @@ export default function MaterialsListWithChat() {
         key = m.fileType.toUpperCase()
       } else if (groupBy === 'date') {
         const date = new Date(m.createdAt)
-        key = date.toLocaleDateString(undefined, { year: 'numeric', month: 'long' })
+        key = date.toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'long',
+        })
       }
 
       if (!groups[key]) groups[key] = []
@@ -231,13 +248,13 @@ export default function MaterialsListWithChat() {
   const activeFilters = getActiveFilters()
 
   return (
-    <div className="flex flex-col md:flex-row md:h-[calc(100vh-144px)] md:overflow-hidden bg-background">
+    <div className="flex flex-col bg-background md:h-[calc(100vh-144px)] md:flex-row md:overflow-hidden">
       {/* Mobile filter toggle */}
       <button
         type="button"
         onClick={() => setFiltersOpen((o) => !o)}
         aria-expanded={filtersOpen}
-        className="md:hidden flex items-center justify-between border-b border-border bg-card px-4 py-3 text-sm font-medium"
+        className="flex items-center justify-between border-b border-border bg-card px-4 py-3 text-sm font-medium md:hidden"
       >
         <span>
           Filter &amp; Group
@@ -249,15 +266,17 @@ export default function MaterialsListWithChat() {
       {/* Left Panel - Filters */}
       <div
         className={cn(
-          'border-b md:border-b-0 md:border-r border-border bg-card p-4 overflow-y-auto md:w-[220px] md:flex-shrink-0',
+          'overflow-y-auto border-b border-border bg-card p-4 md:w-[220px] md:flex-shrink-0 md:border-b-0 md:border-r',
           filtersOpen ? 'block' : 'hidden md:block'
         )}
       >
-        <h2 className="hidden md:block text-lg font-bold mb-4">Filter & Group</h2>
+        <h2 className="mb-4 hidden text-lg font-bold md:block">
+          Filter & Group
+        </h2>
 
         {/* Search */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">
+          <label className="mb-2 block text-sm font-medium">
             Search
             {searching && (
               <span className="ml-2 text-xs font-normal text-muted-foreground">
@@ -270,17 +289,17 @@ export default function MaterialsListWithChat() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search titles & contents..."
-            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           />
         </div>
 
         {/* Group By */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Group by</label>
+          <label className="mb-2 block text-sm font-medium">Group by</label>
           <select
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           >
             <option value="none">None</option>
             <option value="category">Category</option>
@@ -291,33 +310,45 @@ export default function MaterialsListWithChat() {
 
         {/* Status Filter */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Status</label>
+          <label className="mb-2 block text-sm font-medium">Status</label>
           <div className="space-y-1">
-            {(['all', 'completed', 'pending', 'failed'] as FilterStatus[]).map((status) => (
-              <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`w-full px-3 py-1.5 text-xs text-left rounded-md transition-colors ${
-                  statusFilter === status
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary hover:bg-secondary/80'
-                }`}
-              >
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-              </button>
-            ))}
+            {(['all', 'completed', 'pending', 'failed'] as FilterStatus[]).map(
+              (status) => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`w-full rounded-md px-3 py-1.5 text-left text-xs transition-colors ${
+                    statusFilter === status
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary hover:bg-secondary/80'
+                  }`}
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              )
+            )}
           </div>
         </div>
 
         {/* File Type Filter */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">File Type</label>
+          <label className="mb-2 block text-sm font-medium">File Type</label>
           <div className="space-y-1">
-            {(['all', 'pdf', 'txt', 'pptx', 'image', 'youtube', 'url'] as FilterFileType[]).map((type) => (
+            {(
+              [
+                'all',
+                'pdf',
+                'txt',
+                'pptx',
+                'image',
+                'youtube',
+                'url',
+              ] as FilterFileType[]
+            ).map((type) => (
               <button
                 key={type}
                 onClick={() => setFileTypeFilter(type)}
-                className={`w-full px-3 py-1.5 text-xs text-left rounded-md transition-colors ${
+                className={`w-full rounded-md px-3 py-1.5 text-left text-xs transition-colors ${
                   fileTypeFilter === type
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-secondary hover:bg-secondary/80'
@@ -331,13 +362,15 @@ export default function MaterialsListWithChat() {
 
         {/* Active Filters */}
         {activeFilters.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <label className="block text-sm font-medium mb-2">Active Filters</label>
+          <div className="mt-4 border-t border-border pt-4">
+            <label className="mb-2 block text-sm font-medium">
+              Active Filters
+            </label>
             <div className="space-y-1">
               {activeFilters.map((filter) => (
                 <div
                   key={filter}
-                  className="flex items-center justify-between bg-primary/10 px-2 py-1 rounded text-xs"
+                  className="flex items-center justify-between rounded bg-primary/10 px-2 py-1 text-xs"
                 >
                   <span className="truncate">{filter}</span>
                   <button
@@ -354,73 +387,89 @@ export default function MaterialsListWithChat() {
       </div>
 
       {/* Center Panel - Materials List */}
-      <div className="flex-1 md:overflow-y-auto p-4 sm:p-6">
+      <div className="flex-1 p-4 sm:p-6 md:overflow-y-auto">
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">Study materials</h1>
             <button
               onClick={() => setUploadOpen(true)}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               + Upload
             </button>
           </div>
 
           {error && (
-            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+            <p className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
               {error}
             </p>
           )}
 
           {loading ? (
-            <p className="text-center text-muted-foreground py-12">Loading materials…</p>
+            <div className="space-y-3">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-border bg-card p-4"
+                >
+                  <Skeleton className="mb-3 h-5 w-1/3" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              ))}
+            </div>
           ) : Object.keys(groupedMaterials).length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-border rounded-lg">
-              <p className="text-muted-foreground mb-4">No materials found.</p>
+            <div className="rounded-lg border border-dashed border-border py-16 text-center">
+              <p className="mb-4 text-muted-foreground">No materials found.</p>
               <button
                 onClick={() => setUploadOpen(true)}
-                className="text-primary hover:underline font-medium"
+                className="font-medium text-primary hover:underline"
               >
                 Upload your first file
               </button>
             </div>
           ) : (
             <div className="space-y-8">
-              {Object.entries(groupedMaterials).map(([groupName, groupMaterials]) => (
-                <div key={groupName}>
-                  {groupBy !== 'none' && (
-                    <h2 className="text-lg font-semibold mb-3 text-foreground">
-                      {groupName} ({groupMaterials.length})
-                    </h2>
-                  )}
-                  <div className="space-y-3">
-                    {groupMaterials.map((material) => (
-                      <div key={material.id} className="relative">
-                        <MaterialCard
-                          material={material}
-                          onDelete={handleDelete}
-                          onEdit={handleEditMaterial}
-                          onGenerateQuiz={handleGenerateQuiz}
-                        />
-                        {material.parsingStatus === 'completed' && (
-                          <Link
-                            href={`/chat?material=${material.id}`}
-                            className="absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded shadow-sm transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
-                          >
-                            Chat
-                          </Link>
-                        )}
-                      </div>
-                    ))}
+              {Object.entries(groupedMaterials).map(
+                ([groupName, groupMaterials]) => (
+                  <div key={groupName}>
+                    {groupBy !== 'none' && (
+                      <h2 className="mb-3 text-lg font-semibold text-foreground">
+                        {groupName} ({groupMaterials.length})
+                      </h2>
+                    )}
+                    <div className="space-y-3">
+                      {groupMaterials.map((material) => (
+                        <div key={material.id} className="relative">
+                          <MaterialCard
+                            material={material}
+                            onDelete={handleDelete}
+                            onEdit={handleEditMaterial}
+                            onGenerateQuiz={handleGenerateQuiz}
+                          />
+                          {material.parsingStatus === 'completed' && (
+                            <Link
+                              href={`/chat?material=${material.id}`}
+                              className="absolute right-2 top-2 rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                            >
+                              Chat
+                            </Link>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              )}
             </div>
           )}
         </div>
       </div>
 
-      <Modal open={uploadOpen} onClose={() => setUploadOpen(false)} title="Upload material">
+      <Modal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        title="Upload material"
+      >
         <MaterialUploader onUploadComplete={handleUploadComplete} />
       </Modal>
     </div>

@@ -5,11 +5,16 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import { LatexRenderer } from '@/components/ui/LatexRenderer'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import type { ReviewCard, ReviewGradeResult } from '@/lib/types'
 
 const describeInterval = (days: number) =>
-  days === 1 ? 'tomorrow' : days < 30 ? `in ${days} days` : `in ${Math.round(days / 30)} months`
+  days === 1
+    ? 'tomorrow'
+    : days < 30
+      ? `in ${days} days`
+      : `in ${Math.round(days / 30)} months`
 
 export default function ReviewSession() {
   const { session } = useAuth()
@@ -67,12 +72,15 @@ export default function ReviewSession() {
       const data = await response.json()
 
       if (!response.ok) {
-        toast({ message: data.error || 'Failed to grade answer', variant: 'error' })
+        toast({
+          message: data.error || 'Failed to grade answer',
+          variant: 'error',
+        })
         return
       }
 
       setResult(data)
-      setReviewed(prev => ({
+      setReviewed((prev) => ({
         correct: prev.correct + (data.isCorrect ? 1 : 0),
         total: prev.total + 1,
       }))
@@ -86,11 +94,20 @@ export default function ReviewSession() {
   const handleNext = () => {
     setResult(null)
     setUserAnswer('')
-    setIndex(i => i + 1)
+    setIndex((i) => i + 1)
   }
 
   if (loading) {
-    return <p className="py-16 text-center text-muted-foreground">Loading reviews…</p>
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 px-4 py-16">
+        <Skeleton className="h-6 w-1/3" />
+        <div className="space-y-3 rounded-xl border border-border bg-card p-6">
+          <Skeleton className="h-6 w-2/3" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+      </div>
+    )
   }
 
   if (error) {
@@ -109,8 +126,8 @@ export default function ReviewSession() {
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold">Nothing to review</h1>
         <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-          Questions come back here on a schedule after you answer them in a quiz — sooner
-          if you got them wrong, later each time you get them right.
+          Questions come back here on a schedule after you answer them in a quiz
+          — sooner if you got them wrong, later each time you get them right.
         </p>
         <Link
           href="/quizzes"
@@ -127,7 +144,8 @@ export default function ReviewSession() {
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold">Session complete</h1>
         <p className="mt-3 text-muted-foreground">
-          {reviewed.correct} of {reviewed.total} correct. Each one is rescheduled.
+          {reviewed.correct} of {reviewed.total} correct. Each one is
+          rescheduled.
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <button
@@ -199,7 +217,7 @@ export default function ReviewSession() {
 
         {card.questionType === 'multiple_choice' && card.options ? (
           <div className="space-y-3">
-            {card.options.map(option => (
+            {card.options.map((option) => (
               <label
                 key={option}
                 className={`block cursor-pointer rounded-lg border-2 p-4 transition-all ${
@@ -213,18 +231,21 @@ export default function ReviewSession() {
                   name="review-answer"
                   value={option}
                   checked={userAnswer === option}
-                  onChange={e => setUserAnswer(e.target.value)}
+                  onChange={(e) => setUserAnswer(e.target.value)}
                   disabled={!!result}
                   className="mr-3 accent-primary"
                 />
-                <LatexRenderer content={option} className="inline text-foreground" />
+                <LatexRenderer
+                  content={option}
+                  className="inline text-foreground"
+                />
               </label>
             ))}
           </div>
         ) : (
           <textarea
             value={userAnswer}
-            onChange={e => setUserAnswer(e.target.value)}
+            onChange={(e) => setUserAnswer(e.target.value)}
             disabled={!!result}
             rows={5}
             placeholder="Type your answer here..."
@@ -263,8 +284,13 @@ export default function ReviewSession() {
 
             {!result.isCorrect && (
               <div className="mt-3">
-                <p className="text-xs font-medium text-muted-foreground">Correct answer</p>
-                <LatexRenderer content={result.correctAnswer} className="text-foreground" />
+                <p className="text-xs font-medium text-muted-foreground">
+                  Correct answer
+                </p>
+                <LatexRenderer
+                  content={result.correctAnswer}
+                  className="text-foreground"
+                />
               </div>
             )}
 
@@ -274,8 +300,13 @@ export default function ReviewSession() {
 
             {result.explanation && (
               <div className="mt-3">
-                <p className="text-xs font-medium text-muted-foreground">Explanation</p>
-                <LatexRenderer content={result.explanation} className="text-sm text-foreground" />
+                <p className="text-xs font-medium text-muted-foreground">
+                  Explanation
+                </p>
+                <LatexRenderer
+                  content={result.explanation}
+                  className="text-sm text-foreground"
+                />
               </div>
             )}
 
