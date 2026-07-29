@@ -10,67 +10,67 @@
   /* Light Theme — warm neutral + terracotta */
   :root {
     /* Backgrounds */
-    --background: 250 249 246;        /* Off-white paper */
-    --card: 255 255 255;              /* Card/panel background - white */
+    --background: 250 249 246; /* Off-white paper */
+    --card: 255 255 255; /* Card/panel background - white */
 
     /* Text Colors */
-    --foreground: 26 26 26;           /* Ink */
-    --card-foreground: 26 26 26;      /* Text on cards - ink */
-    --muted-foreground: 107 101 96;   /* Secondary text - warm gray */
+    --foreground: 26 26 26; /* Ink */
+    --card-foreground: 26 26 26; /* Text on cards - ink */
+    --muted-foreground: 107 101 96; /* Secondary text - warm gray */
 
     /* Brand Colors */
-    --primary: 162 78 50;             /* Muted clay terracotta */
+    --primary: 162 78 50; /* Muted clay terracotta */
     --primary-foreground: 255 255 255; /* Text on primary - white */
 
     /* UI Elements */
-    --secondary: 237 234 228;         /* Secondary surfaces - warm stone */
+    --secondary: 237 234 228; /* Secondary surfaces - warm stone */
     --secondary-foreground: 26 26 26; /* Text on secondary - ink */
-    --muted: 240 237 231;             /* Muted surfaces - warm stone */
-    --accent: 240 237 231;            /* Accent surfaces - warm stone */
-    --accent-foreground: 26 26 26;    /* Text on accent - ink */
+    --muted: 240 237 231; /* Muted surfaces - warm stone */
+    --accent: 240 237 231; /* Accent surfaces - warm stone */
+    --accent-foreground: 26 26 26; /* Text on accent - ink */
 
     /* Borders & Inputs */
-    --border: 216 210 199;            /* Border color - warm */
-    --input: 216 210 199;             /* Input borders - warm */
-    --ring: 162 78 50;                /* Focus ring - terracotta */
+    --border: 216 210 199; /* Border color - warm */
+    --input: 216 210 199; /* Input borders - warm */
+    --ring: 162 78 50; /* Focus ring - terracotta */
 
     /* Status Colors */
-    --destructive: 192 57 43;         /* Error/danger - warm red */
+    --destructive: 192 57 43; /* Error/danger - warm red */
     --destructive-foreground: 255 255 255; /* Text on destructive - white */
 
     /* Border Radius */
-    --radius: 0.25rem;                /* Default border radius - 4px */
+    --radius: 0.25rem; /* Default border radius - 4px */
   }
 
   /* Dark Theme — warm charcoal + terracotta */
   .dark {
     /* Backgrounds */
-    --background: 26 24 21;           /* Warm charcoal */
-    --card: 36 33 29;                 /* Card/panel background */
+    --background: 26 24 21; /* Warm charcoal */
+    --card: 36 33 29; /* Card/panel background */
 
     /* Text Colors */
-    --foreground: 237 234 228;        /* Warm off-white */
-    --card-foreground: 237 234 228;   /* Text on cards */
-    --muted-foreground: 163 156 147;  /* Secondary text - warm gray */
+    --foreground: 237 234 228; /* Warm off-white */
+    --card-foreground: 237 234 228; /* Text on cards */
+    --muted-foreground: 163 156 147; /* Secondary text - warm gray */
 
     /* Brand Colors */
-    --primary: 198 118 84;            /* Muted clay - lighter for dark */
+    --primary: 198 118 84; /* Muted clay - lighter for dark */
     --primary-foreground: 255 255 255; /* Text on primary - white */
 
     /* UI Elements */
-    --secondary: 51 47 41;            /* Secondary surfaces */
+    --secondary: 51 47 41; /* Secondary surfaces */
     --secondary-foreground: 237 234 228; /* Text on secondary */
-    --muted: 46 42 37;               /* Muted surfaces */
-    --accent: 46 42 37;              /* Accent surfaces */
+    --muted: 46 42 37; /* Muted surfaces */
+    --accent: 46 42 37; /* Accent surfaces */
     --accent-foreground: 237 234 228; /* Text on accent */
 
     /* Borders & Inputs */
-    --border: 66 60 51;              /* Border color - warm */
-    --input: 51 47 41;              /* Input borders */
-    --ring: 198 118 84;             /* Focus ring - terracotta */
+    --border: 66 60 51; /* Border color - warm */
+    --input: 51 47 41; /* Input borders */
+    --ring: 198 118 84; /* Focus ring - terracotta */
 
     /* Status Colors */
-    --destructive: 212 80 63;        /* Error/danger - warm red */
+    --destructive: 212 80 63; /* Error/danger - warm red */
     --destructive-foreground: 255 255 255; /* Text on destructive - white */
   }
 }
@@ -84,11 +84,13 @@
   * {
     @apply border-border;
   }
-  
+
   /* Body Styles */
   body {
-    @apply bg-background text-foreground overflow-x-hidden font-sans;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    @apply overflow-x-hidden bg-background font-sans text-foreground;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
   }
 
   /* Select Dropdown Styling - Force proper colors */
@@ -96,14 +98,14 @@
     background-color: rgb(var(--card));
     color: rgb(var(--card-foreground));
   }
-  
+
   select option {
     background-color: rgb(var(--card));
     color: rgb(var(--card-foreground));
     padding: 0.5rem;
     font-weight: 500;
   }
-  
+
   /* Dark mode select - explicit override */
   .dark select {
     background-color: rgb(36 33 29);
@@ -131,18 +133,37 @@
    ============================================ */
 
 @keyframes sheep-hop {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  30% { transform: translateY(-6px) rotate(-10deg); }
-  60% { transform: translateY(-3px) rotate(10deg); }
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  30% {
+    transform: translateY(-6px) rotate(-10deg);
+  }
+  60% {
+    transform: translateY(-3px) rotate(10deg);
+  }
 }
 
 @keyframes sheep-float {
-  0% { transform: translateY(0) scale(0.7); opacity: 0; }
-  20% { opacity: 1; }
-  100% { transform: translateY(-130px) scale(1.15) rotate(15deg); opacity: 0; }
+  0% {
+    transform: translateY(0) scale(0.7);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-130px) scale(1.15) rotate(15deg);
+    opacity: 0;
+  }
 }
 
 @keyframes sheep-run {
-  0% { transform: translateX(-12vw); }
-  100% { transform: translateX(112vw); }
+  0% {
+    transform: translateX(112vw);
+  }
+  100% {
+    transform: translateX(-12vw);
+  }
 }

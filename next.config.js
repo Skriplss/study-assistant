@@ -2,10 +2,7 @@
 const nextConfig = {
   // Performance optimizations
   compress: true, // Enable gzip compression
-  
-  // Output configuration for Vercel
-  output: 'standalone',
-  
+
   // Image optimization
   images: {
     formats: ['image/avif', 'image/webp'],
@@ -14,10 +11,10 @@ const nextConfig = {
 
   // Production optimizations
   productionBrowserSourceMaps: false, // Disable source maps in production
-  
+
   // React optimizations
   reactStrictMode: true,
-  
+
   // Turbopack configuration (Next.js 16+)
   turbopack: {
     rules: {
@@ -27,15 +24,15 @@ const nextConfig = {
       },
     },
   },
-  
+
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',
     },
     // Optimize package imports
     optimizePackageImports: ['react-force-graph-2d', 'recharts', 'groq-sdk'],
-    // Increase middleware body size limit
-    middlewareClientMaxBodySize: '100mb',
+    // Increase proxy (ex-middleware) body size limit
+    proxyClientMaxBodySize: '100mb',
   },
 }
 
