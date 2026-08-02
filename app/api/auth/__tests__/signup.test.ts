@@ -6,9 +6,8 @@ import { NextRequest } from 'next/server'
 import { POST } from '../signup/route'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 
-// The route signs up through the service-role client, not the browser one —
-// mocking @/lib/supabase/client left the real client in place and every request
-// came back 400.
+// Sign-up runs on the throwaway auth client; the profile insert runs on the
+// service-role one. Both are mocked through the same object for simplicity.
 const mockDb = {
   auth: {
     signUp: jest.fn(),
@@ -22,6 +21,7 @@ jest.mock('server-only', () => ({}))
 
 jest.mock('@/lib/supabase/server', () => ({
   getSupabaseAdmin: jest.fn(() => mockDb),
+  getSupabaseAuthClient: jest.fn(() => mockDb),
 }))
 
 const admin = getSupabaseAdmin() as unknown as typeof mockDb

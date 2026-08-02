@@ -13,7 +13,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -42,7 +45,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -55,9 +61,25 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json()
-    const { title, category, tags } = body
+    const { title, category } = body
 
-    const material = await MaterialService.updateMaterial(id, { title, category, tags })
+    // Same coercion as POST /api/materials — a non-array here used to reach
+    // updateMaterial, which deletes the old tags before choking on the value.
+    const rawTags = body.tags
+    const tags = Array.isArray(rawTags)
+      ? rawTags.map((t: unknown) => String(t).trim()).filter(Boolean)
+      : typeof rawTags === 'string'
+        ? rawTags
+            .split(',')
+            .map((t: string) => t.trim())
+            .filter(Boolean)
+        : undefined
+
+    const material = await MaterialService.updateMaterial(id, {
+      title,
+      category,
+      tags,
+    })
 
     return NextResponse.json({ material }, { status: 200 })
   } catch (error) {
@@ -75,7 +97,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -89,7 +114,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     await MaterialService.deleteMaterial(id)
 
-    return NextResponse.json({ message: 'Material deleted successfully' }, { status: 200 })
+    return NextResponse.json(
+      { message: 'Material deleted successfully' },
+      { status: 200 }
+    )
   } catch (error) {
     console.error('Delete material error:', error)
     return errorResponse(error, 'Failed to delete material')

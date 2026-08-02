@@ -1,6 +1,12 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react'
 
 type Theme = 'light' | 'dark'
 
@@ -11,37 +17,29 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
+// The blocking script in app/layout.tsx applies the stored theme class before
+// first paint; this provider only mirrors it into React state for the toggle.
+// It must always render the Provider — an earlier version returned a bare
+// Fragment until mounted, and the Fragment→Provider type swap remounted the
+// entire app subtree right after hydration.
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light')
-  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-    const stored = localStorage.getItem('theme') as Theme | null
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    
-    if (stored) {
-      setTheme(stored)
-    } else if (prefersDark) {
-      setTheme('dark')
-    }
+    // Adopt whatever the pre-paint script decided instead of re-deriving it —
+    // re-deriving here would clobber the class during the mount render.
+    setTheme(
+      document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+    )
   }, [])
 
-  useEffect(() => {
-    if (!mounted) return
-    
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light'
     const root = document.documentElement
     root.classList.remove('light', 'dark')
-    root.classList.add(theme)
-    localStorage.setItem('theme', theme)
-  }, [theme, mounted])
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light')
-  }
-
-  if (!mounted) {
-    return <>{children}</>
+    root.classList.add(next)
+    localStorage.setItem('theme', next)
+    setTheme(next)
   }
 
   return (

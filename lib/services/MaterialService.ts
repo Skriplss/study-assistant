@@ -1,5 +1,5 @@
 import 'server-only'
- 
+
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { validateMaterialUpload } from '@/lib/materials/file-validation'
 import type { StudyMaterial, MaterialMetadata } from '@/lib/types'
@@ -18,9 +18,14 @@ export class MaterialValidationError extends Error {
     this.name = 'MaterialValidationError'
   }
 }
- 
+
 function tagRows(materialId: string, tags: string[]) {
-  return tags.map((tag) => ({ material_id: materialId, tag: tag.trim().toLowerCase() }))
+  // Dedupe after normalization — ["React", "react "] would otherwise produce
+  // two identical rows and fail the UNIQUE(material_id, tag) constraint.
+  const normalized = new Set(
+    tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean)
+  )
+  return Array.from(normalized, (tag) => ({ material_id: materialId, tag }))
 }
 
 function mapMaterial(material: any, tags: string[]): StudyMaterial {
@@ -43,7 +48,7 @@ function mapMaterial(material: any, tags: string[]): StudyMaterial {
     updatedAt: material.updated_at,
   }
 }
- 
+
 export class MaterialService {
   private static readonly STORAGE_BUCKET = 'study-materials'
 
@@ -77,7 +82,9 @@ export class MaterialService {
       .createSignedUploadUrl(filePath)
 
     if (error || !data) {
-      throw new Error(`Could not create upload URL: ${error?.message ?? 'unknown error'}`)
+      throw new Error(
+        `Could not create upload URL: ${error?.message ?? 'unknown error'}`
+      )
     }
 
     return {
@@ -166,7 +173,7 @@ export class MaterialService {
 
     return this.getMaterial(materialId)
   }
- 
+
   /** Create a link-based material (YouTube / web URL) — no file upload. */
   static async createLinkMaterial(
     userId: string,
@@ -214,19 +221,19 @@ export class MaterialService {
       .select('*')
       .eq('id', materialId)
       .single()
- 
+
     if (error || !material) {
       throw new Error('Material not found')
     }
- 
+
     const { data: tags } = await db
       .from('material_tags')
       .select('tag')
       .eq('material_id', materialId)
- 
+
     return mapMaterial(material, tags?.map((t) => t.tag) || [])
   }
- 
+
   /** Cheap ownership lookup — avoids fetching the full material just to authz. */
   static async getMaterialOwner(materialId: string): Promise<string | null> {
     const db = getSupabaseAdmin()
@@ -248,17 +255,17 @@ export class MaterialService {
       )
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
- 
+
     if (error) {
       throw new Error(`Failed to list materials: ${error.message}`)
     }
- 
+
     const materialIds = materials.map((m) => m.id)
     const { data: tags } = await db
       .from('material_tags')
       .select('material_id, tag')
       .in('material_id', materialIds)
- 
+
     const tagsByMaterial = tags?.reduce(
       (acc, tag) => {
         if (!acc[tag.material_id]) acc[tag.material_id] = []
@@ -267,12 +274,12 @@ export class MaterialService {
       },
       {} as Record<string, string[]>
     )
- 
+
     return materials.map((material) =>
       mapMaterial(material, tagsByMaterial?.[material.id] || [])
     )
   }
- 
+
   static async updateMaterial(
     materialId: string,
     updates: Partial<StudyMaterial>
@@ -281,19 +288,19 @@ export class MaterialService {
     const updateData: { title?: string; category?: string | null } = {}
     if (updates.title) updateData.title = updates.title
     if (updates.category !== undefined) updateData.category = updates.category
- 
+
     const { error } = await db
       .from('study_materials')
       .update(updateData)
       .eq('id', materialId)
- 
+
     if (error) {
       throw new Error(`Update failed: ${error.message}`)
     }
- 
+
     if (updates.tags !== undefined) {
       await db.from('material_tags').delete().eq('material_id', materialId)
- 
+
       if (updates.tags.length > 0) {
         const { error: tagError } = await db
           .from('material_tags')
@@ -303,17 +310,20 @@ export class MaterialService {
         }
       }
     }
- 
+
     return this.getMaterial(materialId)
   }
- 
+
   static async deleteMaterial(materialId: string): Promise<void> {
     const db = getSupabaseAdmin()
     const material = await this.getMaterial(materialId)
 
     // Link materials (youtube/url) have no stored file to remove.
     if (material.filePath) {
-      const extractedPath = material.filePath.replace(/original\.\w+$/, 'extracted.txt')
+      const extractedPath = material.filePath.replace(
+        /original\.\w+$/,
+        'extracted.txt'
+      )
       const { error: storageError } = await db.storage
         .from(this.STORAGE_BUCKET)
         .remove([material.filePath, extractedPath])
@@ -323,7 +333,9 @@ export class MaterialService {
       // the bucket still holds one such orphan, and the privacy policy promises
       // the original goes with the material. Better to fail and be retried.
       if (storageError) {
-        throw new Error(`Delete failed: could not remove stored files: ${storageError.message}`)
+        throw new Error(
+          `Delete failed: could not remove stored files: ${storageError.message}`
+        )
       }
     }
 
@@ -331,12 +343,12 @@ export class MaterialService {
       .from('study_materials')
       .delete()
       .eq('id', materialId)
- 
+
     if (error) {
       throw new Error(`Delete failed: ${error.message}`)
     }
   }
- 
+
   static async downloadMaterial(materialId: string): Promise<Blob> {
     const db = getSupabaseAdmin()
     const material = await this.getMaterial(materialId)
@@ -348,11 +360,11 @@ export class MaterialService {
     const { data, error } = await db.storage
       .from(this.STORAGE_BUCKET)
       .download(material.filePath)
- 
+
     if (error || !data) {
       throw new Error(`Download failed: ${error?.message ?? 'unknown'}`)
     }
- 
+
     return data
   }
 }

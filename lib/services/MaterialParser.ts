@@ -63,12 +63,14 @@ export class MaterialParser {
 
       // Validate that we got meaningful content
       if (!cleanedText || cleanedText.length < 50) {
-        throw new Error('PDF parsing extracted insufficient text. The PDF may be image-based or corrupted.')
+        throw new Error(
+          'PDF parsing extracted insufficient text. The PDF may be image-based or corrupted.'
+        )
       }
 
       // Extract structure info
       const lines = cleanedText.split('\n')
-      const paragraphs = cleanedText.split('\n\n').filter(p => p.length > 0)
+      const paragraphs = cleanedText.split('\n\n').filter((p) => p.length > 0)
 
       return {
         text: cleanedText,
@@ -116,7 +118,7 @@ export class MaterialParser {
       const cleanedText = this.cleanText(text)
 
       const lines = cleanedText.split('\n')
-      const paragraphs = cleanedText.split('\n\n').filter(p => p.length > 0)
+      const paragraphs = cleanedText.split('\n\n').filter((p) => p.length > 0)
 
       return {
         text: cleanedText,
@@ -173,7 +175,7 @@ export class MaterialParser {
       }
 
       const lines = markdownText.split('\n')
-      const paragraphs = cleanedText.split('\n\n').filter(p => p.length > 0)
+      const paragraphs = cleanedText.split('\n\n').filter((p) => p.length > 0)
 
       return {
         text: cleanedText,
@@ -198,14 +200,17 @@ export class MaterialParser {
    */
   static async parsePPTX(buffer: ArrayBuffer): Promise<ParsedContent> {
     try {
-      console.log('[MaterialParser] Attempting to parse PPTX with officeparser...')
+      console.log(
+        '[MaterialParser] Attempting to parse PPTX with officeparser...'
+      )
 
       const result = await officeParser.parseOffice(Buffer.from(buffer), {
-        fileType: 'pptx'
+        fileType: 'pptx',
       })
 
-      // Convert result to string regardless of type
-      const text = typeof result === 'string' ? result : JSON.stringify(result)
+      // officeparser 7.x returns an AST object; older versions returned the
+      // plain text directly. JSON.stringify here would store the raw AST dump.
+      const text = typeof result === 'string' ? result : result.toText()
 
       console.log('[MaterialParser] PPTX raw text length:', text.length || 0)
 
@@ -218,8 +223,8 @@ export class MaterialParser {
             structure: {
               lineCount: 1,
               paragraphCount: 1,
-            }
-          }
+            },
+          },
         }
       }
 
@@ -233,13 +238,13 @@ export class MaterialParser {
             structure: {
               lineCount: 1,
               paragraphCount: 1,
-            }
-          }
+            },
+          },
         }
       }
 
       const lines = cleanedText.split('\n')
-      const paragraphs = cleanedText.split('\n\n').filter(p => p.length > 0)
+      const paragraphs = cleanedText.split('\n\n').filter((p) => p.length > 0)
 
       return {
         text: cleanedText,
@@ -270,7 +275,9 @@ export class MaterialParser {
    * re-encode costs nothing in token terms (the bill is flat regardless of what
    * goes in) and puts that ceiling out of reach.
    */
-  private static async prepareImageForOcr(buffer: ArrayBuffer): Promise<string> {
+  private static async prepareImageForOcr(
+    buffer: ArrayBuffer
+  ): Promise<string> {
     const compressed = await sharp(Buffer.from(buffer))
       .rotate() // apply EXIF orientation — phone photos are routinely sideways
       .resize({
@@ -289,12 +296,18 @@ export class MaterialParser {
     return compressed.toString('base64')
   }
 
-  static async parseImage(buffer: ArrayBuffer, fileType: 'png' | 'jpg' | 'jpeg'): Promise<ParsedContent> {
+  static async parseImage(
+    buffer: ArrayBuffer,
+    fileType: 'png' | 'jpg' | 'jpeg'
+  ): Promise<ParsedContent> {
     try {
       // Always JPEG on the wire: prepareImageForOcr re-encodes whatever came in.
       const base64Image = await this.prepareImageForOcr(buffer)
 
-      const extractedText = await AIService.extractImageText(base64Image, 'image/jpeg')
+      const extractedText = await AIService.extractImageText(
+        base64Image,
+        'image/jpeg'
+      )
 
       if (!extractedText || extractedText.trim().length === 0) {
         throw new Error('No text or content could be extracted from the image')
@@ -357,7 +370,9 @@ export class MaterialParser {
   static async parseURL(sourceUrl: string): Promise<ParsedContent> {
     try {
       const res = await fetch(sourceUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StudyAssistant/1.0)' },
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; StudyAssistant/1.0)',
+        },
       })
       if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`)
 

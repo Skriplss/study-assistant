@@ -5,7 +5,13 @@ import { ApiError } from '@/lib/api/errors'
 import { AIService } from './AIService'
 import { AnalyticsService } from './AnalyticsService'
 import { ReviewService } from './ReviewService'
-import type { Quiz, QuizConfig, Answer, QuizResults, QuizSummary } from '@/lib/types'
+import type {
+  Quiz,
+  QuizConfig,
+  Answer,
+  QuizResults,
+  QuizSummary,
+} from '@/lib/types'
 
 /** Map a DB answer row (snake_case) to an Answer. */
 function mapAnswer(a: any): Answer {
@@ -38,8 +44,13 @@ export class QuizService {
     return (data || []).map((quiz) => {
       // PostgREST types the embed as object-or-array depending on how it infers
       // the relationship; material_id is a plain FK, so it's always one row.
-      const material = quiz.study_materials as { title: string } | { title: string }[] | null
-      const materialTitle = Array.isArray(material) ? material[0]?.title : material?.title
+      const material = quiz.study_materials as
+        | { title: string }
+        | { title: string }[]
+        | null
+      const materialTitle = Array.isArray(material)
+        ? material[0]?.title
+        : material?.title
 
       return {
         id: quiz.id,
@@ -62,15 +73,23 @@ export class QuizService {
     config: QuizConfig
   ): Promise<Quiz> {
     const db = getSupabaseAdmin()
-    
+
     const { data: material } = await db
       .from('study_materials')
-      .select('parsed_content, title, language')
+      .select('parsed_content, title, language, user_id')
       .eq('id', materialId)
       .single()
 
-    if (!material?.parsed_content) {
-      throw new ApiError('This material is still being processed. Try again once it finishes.', 409)
+    // Service-role client bypasses RLS — ownership must be checked here.
+    if (!material || material.user_id !== userId) {
+      throw new ApiError('Material not found', 404)
+    }
+
+    if (!material.parsed_content) {
+      throw new ApiError(
+        'This material is still being processed. Try again once it finishes.',
+        409
+      )
     }
 
     const quizData = await AIService.generateQuiz(
@@ -106,14 +125,19 @@ export class QuizService {
     }))
 
     const { error: qError } = await db.from('questions').insert(questions)
-    if (qError) throw new Error(`Failed to insert questions: ${qError.message}`)
+    if (qError) {
+      // Don't leave a question-less quiz behind — it would sit in the list
+      // forever, unopenable and uncompletable.
+      await db.from('quizzes').delete().eq('id', quizId)
+      throw new Error(`Failed to insert questions: ${qError.message}`)
+    }
 
     return this.getQuiz(quizId)
   }
 
   static async getQuiz(quizId: string): Promise<Quiz> {
     const db = getSupabaseAdmin()
-    
+
     const { data: quiz, error } = await db
       .from('quizzes')
       .select('*')
@@ -124,7 +148,11 @@ export class QuizService {
 
     // Questions and any existing answers are independent reads — run together.
     const [{ data: questions }, { data: answers }] = await Promise.all([
-      db.from('questions').select('*').eq('quiz_id', quizId).order('order_index'),
+      db
+        .from('questions')
+        .select('*')
+        .eq('quiz_id', quizId)
+        .order('order_index'),
       db.from('answers').select('*').eq('quiz_id', quizId),
     ])
 
@@ -133,17 +161,21 @@ export class QuizService {
       userId: quiz.user_id,
       materialId: quiz.material_id,
       title: quiz.title,
-      difficulty: (quiz.difficulty || 'mixed') as 'easy' | 'medium' | 'hard' | 'mixed',
+      difficulty: (quiz.difficulty || 'mixed') as
+        | 'easy'
+        | 'medium'
+        | 'hard'
+        | 'mixed',
       totalQuestions: quiz.total_questions,
       status: quiz.status as 'draft' | 'in_progress' | 'completed',
       score: quiz.score,
-      questions: (questions || []).map(q => ({
+      questions: (questions || []).map((q) => ({
         id: q.id,
         quizId: q.quiz_id,
         questionText: q.question_text,
         questionType: q.question_type as 'multiple_choice' | 'open_ended',
         difficulty: (q.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
-        options: Array.isArray(q.options) ? q.options as string[] : null,
+        options: Array.isArray(q.options) ? (q.options as string[]) : null,
         correctAnswer: q.correct_answer,
         explanation: q.explanation,
         orderIndex: q.order_index,
@@ -167,22 +199,32 @@ export class QuizService {
       db.from('questions').select('*').eq('id', questionId).single(),
     ])
 
-    if (!quiz || quiz.user_id !== userId) throw new ApiError('Quiz not found', 404)
-    if (!question || question.quiz_id !== quizId) throw new ApiError('Question not found', 404)
+    if (!quiz || quiz.user_id !== userId)
+      throw new ApiError('Quiz not found', 404)
+    if (!question || question.quiz_id !== quizId)
+      throw new ApiError('Question not found', 404)
 
     const questionFormatted = {
       id: question.id,
       quizId: question.quiz_id,
       questionText: question.question_text,
       questionType: question.question_type as 'multiple_choice' | 'open_ended',
-      difficulty: (question.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
-      options: Array.isArray(question.options) ? question.options as string[] : null,
+      difficulty: (question.difficulty || 'medium') as
+        | 'easy'
+        | 'medium'
+        | 'hard',
+      options: Array.isArray(question.options)
+        ? (question.options as string[])
+        : null,
       correctAnswer: question.correct_answer,
       explanation: question.explanation,
       orderIndex: question.order_index,
     }
 
-    const verification = await AIService.verifyAnswer(questionFormatted, userAnswer)
+    const verification = await AIService.verifyAnswer(
+      questionFormatted,
+      userAnswer
+    )
 
     const answer = {
       id: crypto.randomUUID(),
@@ -196,17 +238,24 @@ export class QuizService {
     const { error: saveError } = await db
       .from('answers')
       .upsert(answer, { onConflict: 'quiz_id,question_id' })
-    if (saveError) throw new Error(`Failed to save answer: ${saveError.message}`)
+    if (saveError)
+      throw new Error(`Failed to save answer: ${saveError.message}`)
 
     // First answer moves the quiz out of the draft state.
     if (quiz.status === 'draft') {
-      await db.from('quizzes').update({ status: 'in_progress' }).eq('id', quizId)
+      await db
+        .from('quizzes')
+        .update({ status: 'in_progress' })
+        .eq('id', quizId)
     }
 
     return mapAnswer(answer)
   }
 
-  static async completeQuiz(userId: string, quizId: string): Promise<QuizResults> {
+  static async completeQuiz(
+    userId: string,
+    quizId: string
+  ): Promise<QuizResults> {
     const db = getSupabaseAdmin()
 
     // Independent reads — run concurrently.
@@ -214,13 +263,15 @@ export class QuizService {
       db.from('answers').select('*').eq('quiz_id', quizId),
       db
         .from('quizzes')
-        .select('total_questions, user_id, material_id, status, score, completed_at')
+        .select(
+          'total_questions, user_id, material_id, status, score, completed_at'
+        )
         .eq('id', quizId)
         .single(),
     ])
 
-    if (!quiz || !answers) throw new Error('Quiz not found')
-    if (quiz.user_id !== userId) throw new Error('Quiz not found')
+    if (!quiz || !answers) throw new ApiError('Quiz not found', 404)
+    if (quiz.user_id !== userId) throw new ApiError('Quiz not found', 404)
 
     const formatAnswers = () =>
       answers.map((a) => ({
@@ -252,19 +303,38 @@ export class QuizService {
     // Every question must be answered before the quiz can be scored.
     const answeredCount = new Set(answers.map((a) => a.question_id)).size
     if (answeredCount < quiz.total_questions) {
-      throw new Error('All questions must be answered before finishing the quiz')
+      throw new ApiError(
+        'All questions must be answered before finishing the quiz',
+        400
+      )
     }
 
     const correctCount = answers.filter((a) => a.is_correct).length
     const score = (correctCount / quiz.total_questions) * 100
 
-    // Status update, analytics insert and review scheduling are independent —
-    // run concurrently.
+    // Compare-and-set: the early-return guard above only catches sequential
+    // repeats — two concurrent completes both read 'in_progress' and both
+    // passed it, double-writing snapshots and double-advancing SM-2. Only the
+    // request that actually flips the status runs the side effects.
+    const { data: claimed, error: claimError } = await db
+      .from('quizzes')
+      .update({
+        status: 'completed',
+        score,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', quizId)
+      .neq('status', 'completed')
+      .select('id')
+    if (claimError) throw new Error(claimError.message)
+
+    if (!claimed || claimed.length === 0) {
+      // Lost the race — the winner recorded everything; return its results.
+      return this.getResults(userId, quizId)
+    }
+
+    // Analytics insert and review scheduling are independent — run concurrently.
     await Promise.all([
-      db
-        .from('quizzes')
-        .update({ status: 'completed', score, completed_at: new Date().toISOString() })
-        .eq('id', quizId),
       AnalyticsService.recordQuizCompletion(
         quiz.user_id,
         quizId,
@@ -275,7 +345,7 @@ export class QuizService {
       ),
       // Scheduling is a side benefit of finishing a quiz, not part of it — a
       // failure here must not cost the user their score.
-      ReviewService.seedFromQuiz(userId, quizId).catch(error => {
+      ReviewService.seedFromQuiz(userId, quizId).catch((error) => {
         console.error('Failed to schedule reviews for quiz', quizId, error)
       }),
     ])
@@ -290,7 +360,10 @@ export class QuizService {
     }
   }
 
-  static async getResults(userId: string, quizId: string): Promise<QuizResults> {
+  static async getResults(
+    userId: string,
+    quizId: string
+  ): Promise<QuizResults> {
     const db = getSupabaseAdmin()
 
     const [{ data: quiz }, { data: answers }] = await Promise.all([
@@ -298,7 +371,8 @@ export class QuizService {
       db.from('answers').select('*').eq('quiz_id', quizId).order('answered_at'),
     ])
 
-    if (!quiz || quiz.user_id !== userId) throw new Error('Quiz not found')
+    if (!quiz || quiz.user_id !== userId)
+      throw new ApiError('Quiz not found', 404)
 
     const rows = answers || []
     return {
@@ -320,7 +394,8 @@ export class QuizService {
       .eq('id', quizId)
       .single()
 
-    if (!quiz || quiz.user_id !== userId) throw new Error('Quiz not found')
+    if (!quiz || quiz.user_id !== userId)
+      throw new ApiError('Quiz not found', 404)
 
     // Clear prior attempt and reopen the quiz.
     await db.from('answers').delete().eq('quiz_id', quizId)

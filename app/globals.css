@@ -145,20 +145,6 @@
   }
 }
 
-@keyframes sheep-float {
-  0% {
-    transform: translateY(0) scale(0.7);
-    opacity: 0;
-  }
-  20% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-130px) scale(1.15) rotate(15deg);
-    opacity: 0;
-  }
-}
-
 @keyframes sheep-run {
   0% {
     transform: translateX(112vw);

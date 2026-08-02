@@ -6,7 +6,10 @@ import type {
   AnswerVerification,
   GeneratedQuiz,
 } from '@/lib/types'
-import { buildQuizGenerationPrompt, buildAnswerVerificationPrompt } from '@/lib/ai/quiz-prompt'
+import {
+  buildQuizGenerationPrompt,
+  buildAnswerVerificationPrompt,
+} from '@/lib/ai/quiz-prompt'
 import { AIServiceError } from '@/lib/ai/errors'
 
 type FetchImpl = typeof fetch
@@ -75,7 +78,8 @@ export class AIService {
   static getGeminiClient(): GoogleGenAI {
     if (!this.genai) {
       const apiKey = process.env.GOOGLE_AI_API_KEY
-      if (!apiKey) throw new AIServiceError('GOOGLE_AI_API_KEY not configured', 'config')
+      if (!apiKey)
+        throw new AIServiceError('GOOGLE_AI_API_KEY not configured', 'config')
       this.genai = new GoogleGenAI({ apiKey })
     }
     return this.genai
@@ -89,7 +93,10 @@ export class AIService {
   private static withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     let timer: ReturnType<typeof setTimeout>
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new AIServiceError('Timeout', 'timeout')), ms)
+      timer = setTimeout(
+        () => reject(new AIServiceError('Timeout', 'timeout')),
+        ms
+      )
     })
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
   }
@@ -113,7 +120,8 @@ export class AIService {
         // `.text` concatenates the text parts and drops thought parts, so
         // thinking can't leak into the JSON.
         const text = res.text
-        if (!text) throw new AIServiceError('Empty response from Gemini', 'parse')
+        if (!text)
+          throw new AIServiceError('Empty response from Gemini', 'parse')
         return text
       })(),
       this.TIMEOUT
@@ -123,7 +131,8 @@ export class AIService {
   /** Low-level Groq chat POST. Maps transport/HTTP errors to AIServiceError. */
   private static async groqPost(body: object): Promise<string> {
     const apiKey = process.env.GROQ_API_KEY
-    if (!apiKey) throw new AIServiceError('GROQ_API_KEY not configured', 'config')
+    if (!apiKey)
+      throw new AIServiceError('GROQ_API_KEY not configured', 'config')
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), this.TIMEOUT)
@@ -143,7 +152,10 @@ export class AIService {
       if ((err as Error)?.name === 'AbortError') {
         throw new AIServiceError('AI request timed out', 'timeout')
       }
-      throw new AIServiceError((err as Error)?.message ?? 'Network error', 'unavailable')
+      throw new AIServiceError(
+        (err as Error)?.message ?? 'Network error',
+        'unavailable'
+      )
     } finally {
       clearTimeout(timer)
     }
@@ -157,14 +169,19 @@ export class AIService {
   }
 
   /** Single Groq HTTP attempt for a text chat completion. */
-  private static async callGroqOnce(messages: ChatMessage[], opts: GroqOptions): Promise<string> {
+  private static async callGroqOnce(
+    messages: ChatMessage[],
+    opts: GroqOptions
+  ): Promise<string> {
     return this.groqPost({
       model: opts.model,
       messages,
       temperature: opts.temperature,
       max_tokens: opts.maxTokens,
       ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
-      ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
+      ...(opts.reasoningEffort
+        ? { reasoning_effort: opts.reasoningEffort }
+        : {}),
     })
   }
 
@@ -183,12 +200,18 @@ export class AIService {
     // 413 on Groq's free tier is a TPM ceiling (prompt + max_tokens billed up
     // front), not a capability limit — surface it as "too large", not `unknown`,
     // so it maps to a friendly message instead of leaking the raw provider text.
-    if (res.status === 413) return new AIServiceError(message, 'too_large', retryAfter)
+    if (res.status === 413)
+      return new AIServiceError(message, 'too_large', retryAfter)
     if (res.status === 429) {
       const isQuota = /quota|insufficient|billing/i.test(message)
-      return new AIServiceError(message, isQuota ? 'quota' : 'rate_limit', retryAfter)
+      return new AIServiceError(
+        message,
+        isQuota ? 'quota' : 'rate_limit',
+        retryAfter
+      )
     }
-    if (res.status >= 500) return new AIServiceError(message, 'unavailable', retryAfter)
+    if (res.status >= 500)
+      return new AIServiceError(message, 'unavailable', retryAfter)
     return new AIServiceError(message, 'unknown', retryAfter)
   }
 
@@ -200,7 +223,9 @@ export class AIService {
   }
 
   /** Retry a single Groq attempt on transient errors (5xx / rate limit). */
-  private static async withGroqRetry(attempt: () => Promise<string>): Promise<string> {
+  private static async withGroqRetry(
+    attempt: () => Promise<string>
+  ): Promise<string> {
     for (let i = 0; ; i++) {
       try {
         return await attempt()
@@ -222,7 +247,10 @@ export class AIService {
   }
 
   /** Groq call with retry on transient errors (5xx / rate limit). */
-  private static async callGroq(messages: ChatMessage[], opts: GroqOptions): Promise<string> {
+  private static async callGroq(
+    messages: ChatMessage[],
+    opts: GroqOptions
+  ): Promise<string> {
     return this.withGroqRetry(() => this.callGroqOnce(messages, opts))
   }
 
@@ -234,7 +262,10 @@ export class AIService {
    * `raw` reasoning format the `<think>` block lands in `content` — i.e. inside
    * the extracted text.
    */
-  static async extractImageText(base64Image: string, mimeType: string): Promise<string> {
+  static async extractImageText(
+    base64Image: string,
+    mimeType: string
+  ): Promise<string> {
     const prompt =
       'Extract all text from this image. If it contains diagrams, formulas, or charts, ' +
       'describe them in detail. Respond only with the extracted content.'
@@ -253,7 +284,10 @@ export class AIService {
             role: 'user',
             content: [
               { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+              {
+                type: 'image_url',
+                image_url: { url: `data:${mimeType};base64,${base64Image}` },
+              },
             ],
           },
         ],
@@ -275,7 +309,8 @@ export class AIService {
     }
 
     const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new AIServiceError('No JSON found in AI response', 'parse')
+    if (!jsonMatch)
+      throw new AIServiceError('No JSON found in AI response', 'parse')
 
     try {
       return JSON.parse(jsonMatch[0])
@@ -342,16 +377,20 @@ export class AIService {
       const problems: string[] = []
 
       if (q.questionType === 'multiple_choice' && Array.isArray(q.options)) {
-        const unique = new Set(q.options.map((o: string) => o.toLowerCase().trim()))
+        const unique = new Set(
+          q.options.map((o: string) => o.toLowerCase().trim())
+        )
         if (unique.size < q.options.length) problems.push('duplicate options')
         if (q.options.length !== 4) problems.push('needs exactly 4 options')
         const matches = q.options.some(
-          (opt: string) => opt.trim().toLowerCase() === q.correctAnswer?.trim().toLowerCase()
+          (opt: string) =>
+            opt.trim().toLowerCase() === q.correctAnswer?.trim().toLowerCase()
         )
         if (!matches) problems.push('correctAnswer matches no option')
       }
 
-      if (!q.questionText || q.questionText.trim().length < 10) problems.push('question too short')
+      if (!q.questionText || q.questionText.trim().length < 10)
+        problems.push('question too short')
       if (!q.correctAnswer) problems.push('missing correct answer')
 
       if (problems.length > 0) {
@@ -377,7 +416,12 @@ export class AIService {
     language: string | undefined,
     count: number
   ): Promise<{ title?: string; questions: any[] }> {
-    const prompt = buildQuizGenerationPrompt(content, { ...config, questionCount: count }, materialTitle, language)
+    const prompt = buildQuizGenerationPrompt(
+      content,
+      { ...config, questionCount: count },
+      materialTitle,
+      language
+    )
     // Scale the output budget to the question count. Groq bills `max_tokens`
     // against TPM up front (prompt + max_tokens must clear the limit or the
     // request is rejected 413), so this cap is a rate-limit ceiling, not a
@@ -391,7 +435,10 @@ export class AIService {
       // Groq can only serve materials small enough that prompt + maxTokens
       // clears its TPM ceiling; for larger ones this rethrows rather than
       // quietly producing a quiz from a truncated view of the material.
-      console.log('Gemini quiz generation failed, trying Groq:', (error as Error)?.message)
+      console.log(
+        'Gemini quiz generation failed, trying Groq:',
+        (error as Error)?.message
+      )
       raw = await this.complete(prompt, {
         model: this.LARGE_MODEL,
         temperature: 0.7,
@@ -410,7 +457,9 @@ export class AIService {
       // JSON likely truncated at max_tokens — recover complete question objects.
       rawQuestions = this.salvageQuestions(raw)
       if (rawQuestions.length === 0) throw error
-      console.log(`Quiz JSON unparseable; salvaged ${rawQuestions.length} questions`)
+      console.log(
+        `Quiz JSON unparseable; salvaged ${rawQuestions.length} questions`
+      )
     }
 
     return { title, questions: this.filterValidQuestions(rawQuestions) }
@@ -427,7 +476,10 @@ export class AIService {
     // Collapse to a normalized key so near-duplicates ("What is X?" vs
     // "What is X ?") are treated as the same question.
     const dupKey = (q: any) =>
-      (q.questionText || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+      (q.questionText || '')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, ' ')
+        .trim()
 
     const seen = new Set<string>()
     const dedupe = (batch: any[]) => {
@@ -440,7 +492,13 @@ export class AIService {
       }
     }
 
-    const first = await this.requestQuestions(content, config, materialTitle, language, requested)
+    const first = await this.requestQuestions(
+      content,
+      config,
+      materialTitle,
+      language,
+      requested
+    )
     let questions: any[] = []
     dedupe(first.questions)
 
@@ -457,11 +515,15 @@ export class AIService {
         )
         dedupe(extra.questions)
       } catch (error) {
-        console.log('Quiz top-up failed, using partial set:', (error as Error)?.message)
+        console.log(
+          'Quiz top-up failed, using partial set:',
+          (error as Error)?.message
+        )
       }
     }
 
-    if (questions.length === 0) throw new AIServiceError('No valid questions generated', 'parse')
+    if (questions.length === 0)
+      throw new AIServiceError('No valid questions generated', 'parse')
 
     // Never hand back more than requested.
     questions = questions.slice(0, requested)
@@ -475,7 +537,12 @@ export class AIService {
       questions: questions.map((q: any, i: number): any => ({
         questionText: q.questionText,
         questionType: q.questionType,
-        difficulty: q.difficulty || config.difficulty,
+        // Per-question difficulty is CHECK-constrained to easy/medium/hard in
+        // the DB — 'mixed' (a legal quiz-level value) or a model-invented
+        // variant would fail the whole questions insert.
+        difficulty: ['easy', 'medium', 'hard'].includes(q.difficulty)
+          ? q.difficulty
+          : 'medium',
         options: q.options || null,
         correctAnswer: q.correctAnswer,
         explanation: q.explanation || '',
@@ -493,7 +560,8 @@ export class AIService {
 
     // Multiple choice — deterministic, no AI call needed.
     if (question.questionType === 'multiple_choice') {
-      const norm = (s?: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
+      const norm = (s?: string) =>
+        (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
       const isCorrect = norm(userAnswer) === norm(correctAnswer)
       return {
         isCorrect,
@@ -552,8 +620,14 @@ export class AIService {
   }
 
   /** Single-prompt JSON completion via Groq. */
-  private static async complete(prompt: string, groqOpts: GroqOptions): Promise<string> {
-    return this.callGroq([{ role: 'user', content: prompt }], { ...groqOpts, json: true })
+  private static async complete(
+    prompt: string,
+    groqOpts: GroqOptions
+  ): Promise<string> {
+    return this.callGroq([{ role: 'user', content: prompt }], {
+      ...groqOpts,
+      json: true,
+    })
   }
 
   /**

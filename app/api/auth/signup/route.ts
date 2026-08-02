@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { getSupabaseAdmin, getSupabaseAuthClient } from '@/lib/supabase/server'
 import { validatePassword } from '@/lib/auth/password-validation'
 import { applySessionCookies } from '@/lib/auth/session-cookies'
 
@@ -34,9 +34,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const db = getSupabaseAdmin()
-
-    const { data, error } = await db.auth.signUp({
+    // Sign up on a throwaway client, never the shared admin one (see
+    // getSupabaseAdmin's warning about in-memory session adoption).
+    const { data, error } = await getSupabaseAuthClient().auth.signUp({
       email,
       password,
       options: {
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user profile
-    const { error: profileError } = await db
+    const { error: profileError } = await getSupabaseAdmin()
       .from('user_profiles')
       .insert({
         id: data.user.id,

@@ -1,29 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { clearSessionCookies } from '@/lib/auth/session-cookies'
 
+// The browser client revokes the Supabase session itself (signOut in
+// lib/auth/session.tsx); this route only clears the httpOnly cookies.
+// Never call auth.signOut() on the shared admin client here — it signs out
+// whichever user's session that process happens to have cached.
 export async function POST() {
-  try {
-    const { error } = await getSupabaseAdmin().auth.signOut()
-
-    if (error) {
-      console.error('Logout error:', error)
-      return NextResponse.json(
-        { error: 'Failed to logout' },
-        { status: 500 }
-      )
-    }
-
-    const response = NextResponse.json(
-      { message: 'Logout successful' },
-      { status: 200 }
-    )
-    return clearSessionCookies(response)
-  } catch (error) {
-    console.error('Logout error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
+  const response = NextResponse.json(
+    { message: 'Logout successful' },
+    { status: 200 }
+  )
+  return clearSessionCookies(response)
 }

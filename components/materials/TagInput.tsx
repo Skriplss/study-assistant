@@ -30,14 +30,14 @@ export default function TagInput({
   const [highlightIndex, setHighlightIndex] = useState(-1)
   const [showSuggestions, setShowSuggestions] = useState(false)
 
-  const filteredSuggestions = getTagSuggestions(
-    inputValue,
-    suggestions,
-    tags
-  )
+  const filteredSuggestions = getTagSuggestions(inputValue, suggestions, tags)
 
   useEffect(() => {
-    setHighlightIndex(filteredSuggestions.length > 0 ? 0 : -1)
+    // No implicit selection while typing — auto-highlighting the first
+    // suggestion made Enter commit "biology" when the user typed "bio",
+    // and made it impossible to Enter-add a tag that prefixes an existing
+    // one. Highlight is opt-in via the arrow keys.
+    setHighlightIndex(-1)
   }, [inputValue, filteredSuggestions.length])
 
   const commitTag = (raw: string) => {
@@ -72,18 +72,14 @@ export default function TagInput({
     if (e.key === 'ArrowDown' && filteredSuggestions.length > 0) {
       e.preventDefault()
       setShowSuggestions(true)
-      setHighlightIndex((i) =>
-        i < filteredSuggestions.length - 1 ? i + 1 : 0
-      )
+      setHighlightIndex((i) => (i < filteredSuggestions.length - 1 ? i + 1 : 0))
       return
     }
 
     if (e.key === 'ArrowUp' && filteredSuggestions.length > 0) {
       e.preventDefault()
       setShowSuggestions(true)
-      setHighlightIndex((i) =>
-        i > 0 ? i - 1 : filteredSuggestions.length - 1
-      )
+      setHighlightIndex((i) => (i > 0 ? i - 1 : filteredSuggestions.length - 1))
       return
     }
 
@@ -95,7 +91,7 @@ export default function TagInput({
 
   return (
     <div className={className}>
-      <div className="flex gap-2 mb-2 relative">
+      <div className="relative mb-2 flex gap-2">
         <input
           ref={inputRef}
           type="text"
@@ -115,14 +111,14 @@ export default function TagInput({
           aria-expanded={showSuggestions && filteredSuggestions.length > 0}
           aria-controls={listboxId}
           aria-autocomplete="list"
-          className="flex-1 px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 bg-background text-foreground"
+          className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
           placeholder="Add a tag and press Enter"
         />
         <button
           type="button"
           disabled={disabled || !inputValue.trim()}
           onClick={() => commitTag(inputValue)}
-          className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-foreground rounded-md disabled:opacity-50"
+          className="rounded-md bg-secondary px-4 py-2 text-foreground hover:bg-secondary/80 disabled:opacity-50"
         >
           Add
         </button>
@@ -131,17 +127,17 @@ export default function TagInput({
           <ul
             id={listboxId}
             role="listbox"
-            className="absolute z-10 left-0 right-14 top-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-40 overflow-auto"
+            className="absolute left-0 right-14 top-full z-10 mt-1 max-h-40 overflow-auto rounded-md border border-border bg-card shadow-lg"
           >
             {filteredSuggestions.map((suggestion, index) => (
               <li
                 key={suggestion}
                 role="option"
                 aria-selected={index === highlightIndex}
-                className={`px-3 py-2 cursor-pointer text-sm ${
+                className={`cursor-pointer px-3 py-2 text-sm ${
                   index === highlightIndex
                     ? 'bg-primary/10 text-primary'
-                    : 'hover:bg-accent text-foreground'
+                    : 'text-foreground hover:bg-accent'
                 }`}
                 onMouseDown={(e) => {
                   e.preventDefault()
@@ -156,7 +152,7 @@ export default function TagInput({
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 mb-2" role="alert">
+        <p className="mb-2 text-sm text-red-600" role="alert">
           {error}
         </p>
       )}
@@ -166,7 +162,7 @@ export default function TagInput({
           {tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 px-3 py-1 bg-primary/20 text-primary rounded-full text-sm"
+              className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-3 py-1 text-sm text-primary"
             >
               {tag}
               {!disabled && (

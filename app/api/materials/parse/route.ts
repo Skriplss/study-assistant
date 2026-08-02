@@ -55,6 +55,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // A parse can die without cleanup (platform timeout, OOM, deploy) — treat
+    // a fresh 'processing' as busy, but let a stale one be retried instead of
+    // wedging the material forever.
+    if (material.parsingStatus === 'processing') {
+      const ageMs = Date.now() - new Date(material.updatedAt).getTime()
+      if (ageMs < 5 * 60 * 1000) {
+        return NextResponse.json(
+          { error: 'Parsing is already in progress' },
+          { status: 409 }
+        )
+      }
+    }
+
     // Update status to processing
     const db = getSupabaseAdmin()
     await db
@@ -63,7 +76,8 @@ export async function POST(request: NextRequest) {
       .eq('id', materialId)
 
     try {
-      const isLink = material.fileType === 'youtube' || material.fileType === 'url'
+      const isLink =
+        material.fileType === 'youtube' || material.fileType === 'url'
 
       let parsedContent
       if (isLink) {
@@ -83,7 +97,14 @@ export async function POST(request: NextRequest) {
         // Parse the file
         parsedContent = await MaterialParser.parseMaterial(
           buffer,
-          material.fileType as 'pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg',
+          material.fileType as
+            | 'pdf'
+            | 'txt'
+            | 'md'
+            | 'pptx'
+            | 'png'
+            | 'jpg'
+            | 'jpeg',
           material.fileSize
         )
       }
@@ -105,7 +126,12 @@ export async function POST(request: NextRequest) {
         .eq('id', materialId)
 
       if (updateError) {
-        throw new Error(`Failed to save parsed content: ${updateError.message}`)
+        // The message below ends up user-visible (stored as parsing_error and
+        // returned as `details`) — keep postgres internals out of it.
+        console.error('Failed to save parsed content:', updateError, {
+          materialId,
+        })
+        throw new Error('Failed to save parsed content')
       }
 
       // Store extracted text in storage (optional backup) — file materials only.

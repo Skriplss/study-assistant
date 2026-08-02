@@ -9,7 +9,9 @@ jest.mock('../AIService', () => ({
 }))
 
 jest.mock('../AnalyticsService', () => ({
-  AnalyticsService: { recordQuizCompletion: jest.fn().mockResolvedValue(undefined) },
+  AnalyticsService: {
+    recordQuizCompletion: jest.fn().mockResolvedValue(undefined),
+  },
 }))
 
 jest.mock('../ReviewService', () => ({
@@ -42,21 +44,31 @@ const ANSWERS = [
   },
 ]
 
-/** Fluent mock whose terminal await resolves to { data }. */
-function thenable(data: unknown) {
+/** Fluent mock whose terminal await resolves to { data } — or, once update()
+ * has been called on the chain, to { data: claimData } so the CAS claim in
+ * completeQuiz can be steered per-test. */
+function thenable(data: unknown, claimData: unknown = [{ id: 'q1' }]) {
   const chain: any = {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    order: jest.fn().mockReturnThis(),
     single: jest.fn().mockResolvedValue({ data }),
-    update: jest.fn().mockReturnThis(),
+    update: jest.fn(() => {
+      chain._updated = true
+      return chain
+    }),
   }
-  chain.then = (resolve: any) => Promise.resolve({ data }).then(resolve)
+  chain.then = (resolve: any) =>
+    Promise.resolve(
+      chain._updated ? { data: claimData, error: null } : { data }
+    ).then(resolve)
   return chain
 }
 
-function setupDb(quiz: Record<string, unknown>) {
+function setupDb(quiz: Record<string, unknown>, claimData?: unknown) {
   mockDb.from.mockImplementation((table: string) =>
-    table === 'answers' ? thenable(ANSWERS) : thenable(quiz)
+    table === 'answers' ? thenable(ANSWERS) : thenable(quiz, claimData)
   )
 }
 
@@ -66,7 +78,12 @@ describe('QuizService.completeQuiz idempotency', () => {
   beforeEach(() => jest.clearAllMocks())
 
   it('scores an open quiz and records it once', async () => {
-    setupDb({ ...BASE_QUIZ, status: 'in_progress', score: null, completed_at: null })
+    setupDb({
+      ...BASE_QUIZ,
+      status: 'in_progress',
+      score: null,
+      completed_at: null,
+    })
 
     const result = await QuizService.completeQuiz('u1', 'q1')
 
@@ -98,8 +115,28 @@ describe('QuizService.completeQuiz idempotency', () => {
     expect(result.answers).toHaveLength(2)
   })
 
+  it('records nothing when a concurrent request wins the completion race', async () => {
+    // Both requests read 'in_progress', but the CAS update matches zero rows
+    // for the loser — it must return results without re-recording anything.
+    setupDb(
+      { ...BASE_QUIZ, status: 'in_progress', score: null, completed_at: null },
+      []
+    )
+
+    const result = await QuizService.completeQuiz('u1', 'q1')
+
+    expect(AnalyticsService.recordQuizCompletion).not.toHaveBeenCalled()
+    expect(ReviewService.seedFromQuiz).not.toHaveBeenCalled()
+    expect(result.answers).toHaveLength(2)
+  })
+
   it('re-records after a retake, because retakeQuiz reopens the quiz', async () => {
-    setupDb({ ...BASE_QUIZ, status: 'in_progress', score: null, completed_at: null })
+    setupDb({
+      ...BASE_QUIZ,
+      status: 'in_progress',
+      score: null,
+      completed_at: null,
+    })
 
     await QuizService.completeQuiz('u1', 'q1')
 
@@ -108,7 +145,13 @@ describe('QuizService.completeQuiz idempotency', () => {
   })
 
   it('still refuses a quiz that is not fully answered', async () => {
-    setupDb({ ...BASE_QUIZ, total_questions: 5, status: 'in_progress', score: null, completed_at: null })
+    setupDb({
+      ...BASE_QUIZ,
+      total_questions: 5,
+      status: 'in_progress',
+      score: null,
+      completed_at: null,
+    })
 
     await expect(QuizService.completeQuiz('u1', 'q1')).rejects.toThrow(
       'All questions must be answered'
@@ -117,8 +160,16 @@ describe('QuizService.completeQuiz idempotency', () => {
   })
 
   it('refuses a quiz owned by someone else', async () => {
-    setupDb({ ...BASE_QUIZ, user_id: 'someone-else', status: 'completed', score: 50, completed_at: null })
+    setupDb({
+      ...BASE_QUIZ,
+      user_id: 'someone-else',
+      status: 'completed',
+      score: 50,
+      completed_at: null,
+    })
 
-    await expect(QuizService.completeQuiz('u1', 'q1')).rejects.toThrow('Quiz not found')
+    await expect(QuizService.completeQuiz('u1', 'q1')).rejects.toThrow(
+      'Quiz not found'
+    )
   })
 })

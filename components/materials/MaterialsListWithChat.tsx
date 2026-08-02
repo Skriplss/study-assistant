@@ -203,7 +203,9 @@ export default function MaterialsListWithChat() {
   // Group materials
   const groupedMaterials = useMemo(() => {
     if (groupBy === 'none') {
-      return { Ungrouped: filteredMaterials }
+      // No key at all when empty — a permanent 'Ungrouped' key made the
+      // "No materials found" empty state unreachable in the default view.
+      return filteredMaterials.length ? { Ungrouped: filteredMaterials } : {}
     }
 
     const groups: Record<string, StudyMaterial[]> = {}

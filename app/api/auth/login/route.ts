@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { getSupabaseAdmin, getSupabaseAuthClient } from '@/lib/supabase/server'
 import { applySessionCookies } from '@/lib/auth/session-cookies'
 
 export async function POST(request: NextRequest) {
@@ -15,15 +15,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Attempt to sign in
-    const { data, error } = await getSupabaseAdmin().auth.signInWithPassword({
-      email,
-      password,
-    })
+    // Attempt to sign in — on a throwaway client, never the shared admin one
+    // (see getSupabaseAdmin's warning about in-memory session adoption).
+    const { data, error } =
+      await getSupabaseAuthClient().auth.signInWithPassword({
+        email,
+        password,
+      })
 
     if (error) {
       console.error('Login error:', error)
-      
+
       // Return generic error for security
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -32,10 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!data.user || !data.session) {
-      return NextResponse.json(
-        { error: 'Login failed' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Login failed' }, { status: 401 })
     }
 
     // Get user profile

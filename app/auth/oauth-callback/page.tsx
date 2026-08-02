@@ -15,15 +15,29 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const providerError = params.get('error_description') || params.get('error')
+    // Supabase delivers some OAuth failures as hash-fragment params, not
+    // query params — check both, or the user stares at the spinner for the
+    // full timeout with the real reason discarded.
+    const query = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const providerError =
+      query.get('error_description') ||
+      query.get('error') ||
+      hash.get('error_description') ||
+      hash.get('error')
     if (providerError) {
       setError(providerError)
       return
     }
 
     let done = false
-    const finish = async (session: { access_token: string; refresh_token: string; expires_in?: number } | null) => {
+    const finish = async (
+      session: {
+        access_token: string
+        refresh_token: string
+        expires_in?: number
+      } | null
+    ) => {
       if (done || !session) return
       done = true
 
@@ -66,7 +80,10 @@ export default function AuthCallbackPage() {
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium text-destructive">
             {error}
           </div>
-          <Link href="/auth/login" className="text-sm font-medium text-primary hover:underline">
+          <Link
+            href="/auth/login"
+            className="text-sm font-medium text-primary hover:underline"
+          >
             Back to login
           </Link>
         </div>

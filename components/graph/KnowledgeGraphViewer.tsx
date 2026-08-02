@@ -46,7 +46,11 @@ interface ThemeColors {
   border: string
 }
 
-function cssVar(styles: CSSStyleDeclaration, name: string, fallback: string): string {
+function cssVar(
+  styles: CSSStyleDeclaration,
+  name: string,
+  fallback: string
+): string {
   const raw = styles.getPropertyValue(name).trim()
   return raw ? `rgb(${raw.split(/\s+/).join(', ')})` : fallback
 }
@@ -116,8 +120,16 @@ const DEFAULTS = {
 // Earthy, muted palette — distinct but in the same warm register as the theme.
 // Tuned to sit on the dark charcoal canvas.
 const CATEGORY_PALETTE = [
-  '#B5563A', '#6E7F4E', '#C8923A', '#4E7E7A', '#8A5A7A',
-  '#A94D4A', '#5B7C99', '#7D6B4F', '#9A9440', '#6B5B95',
+  '#B5563A',
+  '#6E7F4E',
+  '#C8923A',
+  '#4E7E7A',
+  '#8A5A7A',
+  '#A94D4A',
+  '#5B7C99',
+  '#7D6B4F',
+  '#9A9440',
+  '#6B5B95',
 ]
 const UNCATEGORIZED_COLOR = '#A39C93'
 // On the light (milky-white) canvas we drop the palette and render every node
@@ -143,7 +155,7 @@ function Slider({
 }) {
   return (
     <label className="block">
-      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+      <div className="mb-1 flex justify-between text-xs text-muted-foreground">
         <span>{label}</span>
         <span className="tabular-nums">{format ? format(value) : value}</span>
       </div>
@@ -153,8 +165,8 @@ function Slider({
         max={max}
         step={step}
         value={value}
-        onChange={e => onChange(parseFloat(e.target.value))}
-        className="w-full accent-primary cursor-pointer"
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="w-full cursor-pointer accent-primary"
       />
     </label>
   )
@@ -202,7 +214,10 @@ export function KnowledgeGraphViewer() {
   useEffect(() => {
     setColors(readThemeColors())
     const obs = new MutationObserver(() => setColors(readThemeColors()))
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
     return () => obs.disconnect()
   }, [])
 
@@ -218,7 +233,7 @@ export function KnowledgeGraphViewer() {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const ro = new ResizeObserver(entries => {
+    const ro = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect
       if (rect?.width) setWidth(rect.width)
       if (rect?.height) setHeight(rect.height)
@@ -235,6 +250,10 @@ export function KnowledgeGraphViewer() {
         const data: KnowledgeGraph = await res.json()
         setGraph(data)
         didFitRef.current = false
+      } else {
+        // Without this a 500 leaves graph null and the user is told they
+        // have no materials.
+        toast({ message: 'Failed to load the graph', variant: 'error' })
       }
     } catch (err) {
       console.error('Failed to load graph:', err)
@@ -259,7 +278,7 @@ export function KnowledgeGraphViewer() {
       neighbors.get(e.source)!.add(e.target)
       neighbors.get(e.target)!.add(e.source)
     }
-    const nodes: FGNode[] = (graph?.nodes ?? []).map(n => {
+    const nodes: FGNode[] = (graph?.nodes ?? []).map((n) => {
       const degree = degreeById.get(n.id) ?? 0
       return {
         id: n.id,
@@ -270,7 +289,7 @@ export function KnowledgeGraphViewer() {
         r: 4 + Math.sqrt(degree) * 2.6,
       }
     })
-    const links: FGLink[] = (graph?.edges ?? []).map(e => ({
+    const links: FGLink[] = (graph?.edges ?? []).map((e) => ({
       source: e.source,
       target: e.target,
       strength: e.strength,
@@ -315,11 +334,17 @@ export function KnowledgeGraphViewer() {
   // Stable color per category + whether any node is uncategorized (for legend).
   const { categoryColors, hasUncategorized } = useMemo(() => {
     const cats = Array.from(
-      new Set((graph?.nodes ?? []).map(n => n.data.category).filter(Boolean) as string[])
+      new Set(
+        (graph?.nodes ?? [])
+          .map((n) => n.data.category)
+          .filter(Boolean) as string[]
+      )
     ).sort()
     const map = new Map<string, string>()
-    cats.forEach((c, i) => map.set(c, CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]))
-    const hasUncategorized = (graph?.nodes ?? []).some(n => !n.data.category)
+    cats.forEach((c, i) =>
+      map.set(c, CATEGORY_PALETTE[i % CATEGORY_PALETTE.length])
+    )
+    const hasUncategorized = (graph?.nodes ?? []).some((n) => !n.data.category)
     return { categoryColors: map, hasUncategorized }
   }, [graph])
 
@@ -349,14 +374,27 @@ export function KnowledgeGraphViewer() {
   useEffect(() => {
     const fg = fgRef.current
     if (!fg || !searchIds || searchIds.size === 0) return
-    fg.zoomToFit(500, 80, (node: { id?: string | number }) => searchIds.has(String(node.id)))
+    fg.zoomToFit(500, 80, (node: { id?: string | number }) =>
+      searchIds.has(String(node.id))
+    )
   }, [searchIds])
 
   const handleAnalyze = async () => {
     if (!session) return
     setAnalyzing(true)
     try {
-      await fetchWithAuth(session, '/api/graph/analyze', { method: 'POST' })
+      const res = await fetchWithAuth(session, '/api/graph/analyze', {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        // A 429/500 here used to read as "analysis found nothing".
+        const data = await res.json().catch(() => ({}))
+        toast({
+          message: data.error || 'Failed to analyze connections',
+          variant: 'error',
+        })
+        return
+      }
       await loadGraph()
     } catch {
       toast({ message: 'Failed to analyze connections', variant: 'error' })
@@ -380,7 +418,7 @@ export function KnowledgeGraphViewer() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex h-96 items-center justify-center">
         <Spinner size="lg" className="text-primary" />
       </div>
     )
@@ -388,36 +426,45 @@ export function KnowledgeGraphViewer() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center">
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Knowledge Graph</h2>
           <p className="text-sm text-muted-foreground">
-            {graph?.nodes.length ?? 0} materials, {graph?.edges.length ?? 0} connections
+            {graph?.nodes.length ?? 0} materials, {graph?.edges.length ?? 0}{' '}
+            connections
           </p>
         </div>
-        <Button onClick={handleAnalyze} disabled={analyzing} loading={analyzing}>
+        <Button
+          onClick={handleAnalyze}
+          disabled={analyzing}
+          loading={analyzing}
+        >
           {analyzing ? 'Analyzing…' : 'Analyze Connections'}
         </Button>
       </div>
 
       {!graph || graph.nodes.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-border rounded-lg">
-          <p className="text-muted-foreground mb-4">
+        <div className="rounded-lg border border-dashed border-border py-16 text-center">
+          <p className="mb-4 text-muted-foreground">
             No materials to display. Upload and parse materials first.
           </p>
-          <Button onClick={handleAnalyze} disabled={analyzing} loading={analyzing}>
+          <Button
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            loading={analyzing}
+          >
             Analyze Connections
           </Button>
         </div>
       ) : (
         <>
           {/* Mobile panel toggles */}
-          <div className="flex gap-2 mb-3 lg:hidden">
+          <div className="mb-3 flex gap-2 lg:hidden">
             <button
               type="button"
               onClick={() => setLeftOpen((o) => !o)}
               aria-expanded={leftOpen}
-              className="flex-1 text-xs px-3 py-2 border border-border rounded hover:bg-muted text-foreground transition-colors"
+              className="flex-1 rounded border border-border px-3 py-2 text-xs text-foreground transition-colors hover:bg-muted"
             >
               Search &amp; Legend {leftOpen ? '▲' : '▼'}
             </button>
@@ -425,29 +472,31 @@ export function KnowledgeGraphViewer() {
               type="button"
               onClick={() => setRightOpen((o) => !o)}
               aria-expanded={rightOpen}
-              className="flex-1 text-xs px-3 py-2 border border-border rounded hover:bg-muted text-foreground transition-colors"
+              className="flex-1 rounded border border-border px-3 py-2 text-xs text-foreground transition-colors hover:bg-muted"
             >
               Controls {rightOpen ? '▲' : '▼'}
             </button>
           </div>
 
-          <div className="flex flex-col lg:flex-row border border-border rounded-lg overflow-hidden lg:min-h-[520px] lg:h-[min(80vh,860px)]">
+          <div className="flex flex-col overflow-hidden rounded-lg border border-border lg:h-[min(80vh,860px)] lg:min-h-[520px] lg:flex-row">
             <aside
               className={cn(
-                'w-full lg:w-56 shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-card overflow-y-auto p-4 space-y-5',
+                'w-full shrink-0 space-y-5 overflow-y-auto border-b border-border bg-card p-4 lg:w-56 lg:border-b-0 lg:border-r',
                 leftOpen ? 'block' : 'hidden lg:block'
               )}
             >
               <div>
-                <h4 className="font-semibold text-foreground text-sm mb-2">Search</h4>
+                <h4 className="mb-2 text-sm font-semibold text-foreground">
+                  Search
+                </h4>
                 <input
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={(e) => setSearch(e.target.value)}
                   placeholder="Find a material…"
-                  className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 {searchIds && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {searchIds.size} match{searchIds.size === 1 ? '' : 'es'}
                   </p>
                 )}
@@ -455,12 +504,17 @@ export function KnowledgeGraphViewer() {
 
               {(categoryColors.size > 0 || hasUncategorized) && (
                 <div>
-                  <h4 className="font-semibold text-foreground text-sm mb-3">Categories</h4>
+                  <h4 className="mb-3 text-sm font-semibold text-foreground">
+                    Categories
+                  </h4>
                   <ul className="space-y-1.5">
                     {[...categoryColors].map(([cat]) => (
-                      <li key={cat} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <li
+                        key={cat}
+                        className="flex items-center gap-2 text-xs text-muted-foreground"
+                      >
                         <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ backgroundColor: nodeColor(cat) }}
                         />
                         <span className="truncate">{cat}</span>
@@ -469,7 +523,7 @@ export function KnowledgeGraphViewer() {
                     {hasUncategorized && (
                       <li className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ backgroundColor: nodeColor(null) }}
                         />
                         <span className="truncate">Uncategorized</span>
@@ -480,7 +534,10 @@ export function KnowledgeGraphViewer() {
               )}
             </aside>
 
-            <div ref={containerRef} className="relative flex-1 min-w-0 h-[55vh] lg:h-auto">
+            <div
+              ref={containerRef}
+              className="relative h-[55vh] min-w-0 flex-1 lg:h-auto"
+            >
               {colors && (
                 <ForceGraph2D
                   ref={fgRef as never}
@@ -508,32 +565,53 @@ export function KnowledgeGraphViewer() {
                       didFitRef.current = true
                     }
                   }}
-                  onNodeHover={(node: FGNode | null) => setHoverId(node?.id ?? null)}
+                  onNodeHover={(node: FGNode | null) =>
+                    setHoverId(node?.id ?? null)
+                  }
                   onNodeClick={(node: FGNode) => handleNodeClick(node)}
                   onBackgroundClick={() => setTooltip(null)}
-                  nodeVisibility={(node: FGNode) => showOrphans || node.degree > 0}
+                  nodeVisibility={(node: FGNode) =>
+                    showOrphans || node.degree > 0
+                  }
                   linkVisibility={(l: FGLink) => l.strength >= minStrength}
                   linkColor={(l: FGLink) =>
                     hoverId &&
-                      (linkEndId(l.source) === hoverId || linkEndId(l.target) === hoverId)
+                    (linkEndId(l.source) === hoverId ||
+                      linkEndId(l.target) === hoverId)
                       ? colors.primary
                       : withAlpha(colors.muted, 0.4)
                   }
                   linkWidth={(l: FGLink) => {
                     const active =
                       hoverId &&
-                      (linkEndId(l.source) === hoverId || linkEndId(l.target) === hoverId)
+                      (linkEndId(l.source) === hoverId ||
+                        linkEndId(l.target) === hoverId)
                     return Math.max(1, l.strength * 4) * (active ? 1.8 : 1)
                   }}
                   nodeRelSize={1}
-                  nodePointerAreaPaint={(node: FGNode, color: string, ctx: CanvasRenderingContext2D) => {
+                  nodePointerAreaPaint={(
+                    node: FGNode,
+                    color: string,
+                    ctx: CanvasRenderingContext2D
+                  ) => {
                     ctx.fillStyle = color
                     ctx.beginPath()
-                    ctx.arc(node.x!, node.y!, node.r * nodeScale + 3, 0, 2 * Math.PI)
+                    ctx.arc(
+                      node.x!,
+                      node.y!,
+                      node.r * nodeScale + 3,
+                      0,
+                      2 * Math.PI
+                    )
                     ctx.fill()
                   }}
-                  nodeCanvasObject={(node: FGNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-                    const matchesHover = !highlightNodes || highlightNodes.has(node.id)
+                  nodeCanvasObject={(
+                    node: FGNode,
+                    ctx: CanvasRenderingContext2D,
+                    globalScale: number
+                  ) => {
+                    const matchesHover =
+                      !highlightNodes || highlightNodes.has(node.id)
                     const matchesSearch = !searchIds || searchIds.has(node.id)
                     const active = matchesHover && matchesSearch
                     const isHover = node.id === hoverId
@@ -568,7 +646,10 @@ export function KnowledgeGraphViewer() {
                       ctx.textAlign = 'center'
                       ctx.textBaseline = 'top'
                       ctx.globalAlpha = active ? 1 : 0.2
-                      const label = node.label.length > 28 ? node.label.slice(0, 27) + '…' : node.label
+                      const label =
+                        node.label.length > 28
+                          ? node.label.slice(0, 27) + '…'
+                          : node.label
                       // Halo in the background color so the ink label stays legible
                       // over nodes, edges, and the canvas on both themes.
                       ctx.lineWidth = Math.max(2 / globalScale, 0.5)
@@ -584,20 +665,24 @@ export function KnowledgeGraphViewer() {
               )}
 
               {tooltip && (
-                <div className="absolute bottom-4 left-4 bg-card border border-border rounded-lg shadow-lg p-4 max-w-xs z-10">
-                  <h3 className="font-semibold text-sm mb-1 text-foreground">{tooltip.title}</h3>
+                <div className="absolute bottom-4 left-4 z-10 max-w-xs rounded-lg border border-border bg-card p-4 shadow-lg">
+                  <h3 className="mb-1 text-sm font-semibold text-foreground">
+                    {tooltip.title}
+                  </h3>
                   {tooltip.category && (
-                    <p className="text-xs text-muted-foreground mb-2">{tooltip.category}</p>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      {tooltip.category}
+                    </p>
                   )}
-                  <p className="text-xs text-muted-foreground mb-2">
+                  <p className="mb-2 text-xs text-muted-foreground">
                     {tooltip.connectionCount} connection(s)
                   </p>
                   {tooltip.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {tooltip.tags.map(tag => (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {tooltip.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs"
+                          className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary"
                         >
                           {tag}
                         </span>
@@ -606,7 +691,7 @@ export function KnowledgeGraphViewer() {
                   )}
                   <Link
                     href={`/materials/${tooltip.nodeId}`}
-                    className="text-xs font-medium text-primary hover:underline inline-block"
+                    className="inline-block text-xs font-medium text-primary hover:underline"
                   >
                     Open material →
                   </Link>
@@ -616,12 +701,14 @@ export function KnowledgeGraphViewer() {
 
             <aside
               className={cn(
-                'w-full lg:w-56 shrink-0 border-t lg:border-t-0 lg:border-l border-border bg-card overflow-y-auto p-4 space-y-5',
+                'w-full shrink-0 space-y-5 overflow-y-auto border-t border-border bg-card p-4 lg:w-56 lg:border-l lg:border-t-0',
                 rightOpen ? 'block' : 'hidden lg:block'
               )}
             >
               <div>
-                <h4 className="font-semibold text-foreground text-sm mb-3">Forces</h4>
+                <h4 className="mb-3 text-sm font-semibold text-foreground">
+                  Forces
+                </h4>
                 <div className="space-y-3">
                   <Slider
                     label="Repel"
@@ -629,7 +716,7 @@ export function KnowledgeGraphViewer() {
                     min={20}
                     max={400}
                     step={10}
-                    onChange={v => setRepel(-v)}
+                    onChange={(v) => setRepel(-v)}
                   />
                   <Slider
                     label="Link distance"
@@ -643,7 +730,9 @@ export function KnowledgeGraphViewer() {
               </div>
 
               <div>
-                <h4 className="font-semibold text-foreground text-sm mb-3">Display</h4>
+                <h4 className="mb-3 text-sm font-semibold text-foreground">
+                  Display
+                </h4>
                 <div className="space-y-3">
                   <Slider
                     label="Node size"
@@ -652,7 +741,7 @@ export function KnowledgeGraphViewer() {
                     max={2.5}
                     step={0.1}
                     onChange={setNodeScale}
-                    format={v => `${v.toFixed(1)}x`}
+                    format={(v) => `${v.toFixed(1)}x`}
                   />
                   <Slider
                     label="Text fade"
@@ -661,13 +750,15 @@ export function KnowledgeGraphViewer() {
                     max={2}
                     step={0.05}
                     onChange={setLabelThreshold}
-                    format={v => v.toFixed(2)}
+                    format={(v) => v.toFixed(2)}
                   />
                 </div>
               </div>
 
               <div>
-                <h4 className="font-semibold text-foreground text-sm mb-3">Filters</h4>
+                <h4 className="mb-3 text-sm font-semibold text-foreground">
+                  Filters
+                </h4>
                 <div className="space-y-3">
                   <Slider
                     label="Min strength"
@@ -676,14 +767,14 @@ export function KnowledgeGraphViewer() {
                     max={1}
                     step={0.05}
                     onChange={setMinStrength}
-                    format={v => `${Math.round(v * 100)}%`}
+                    format={(v) => `${Math.round(v * 100)}%`}
                   />
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={showOrphans}
-                      onChange={e => setShowOrphans(e.target.checked)}
-                      className="accent-primary cursor-pointer"
+                      onChange={(e) => setShowOrphans(e.target.checked)}
+                      className="cursor-pointer accent-primary"
                     />
                     Show orphans
                   </label>
@@ -692,7 +783,7 @@ export function KnowledgeGraphViewer() {
 
               <button
                 onClick={resetControls}
-                className="w-full text-xs px-3 py-1.5 border border-border rounded hover:bg-muted text-foreground transition-colors"
+                className="w-full rounded border border-border px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
               >
                 Reset
               </button>

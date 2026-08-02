@@ -21,8 +21,13 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
+    // Number(null) and Number('') are 0, not NaN — a missing param must fall
+    // through to the default, not clamp to 1.
     const requested = Number(searchParams.get('limit'))
-    const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 50) : 20
+    const limit =
+      Number.isFinite(requested) && requested >= 1
+        ? Math.min(requested, 50)
+        : 20
 
     // countDue is the whole backlog; cards are just the slice for this session.
     const [cards, dueCount] = await Promise.all([

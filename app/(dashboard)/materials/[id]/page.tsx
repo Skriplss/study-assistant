@@ -78,11 +78,18 @@ export default function MaterialDetailPage() {
     if (!session) return
     if (!confirm('Delete this material?')) return
 
-    const response = await fetchWithAuth(session, `/api/materials/${id}`, {
-      method: 'DELETE',
-    })
-    if (response.ok) {
+    try {
+      const response = await fetchWithAuth(session, `/api/materials/${id}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        setError(data.error || 'Failed to delete material')
+        return
+      }
       window.location.href = '/materials'
+    } catch {
+      setError('Failed to delete material')
     }
   }
 
@@ -137,16 +144,22 @@ export default function MaterialDetailPage() {
         }}
       />
 
-      {(material.parsingStatus === 'pending' ||
-        material.parsingStatus === 'failed') && (
+      {material.parsingStatus !== 'completed' && (
         <div className="flex items-center gap-3">
+          {/* 'processing' gets the button too — a parse killed by a platform
+              timeout leaves that status behind forever, and the server 409s
+              if a parse is genuinely still running. */}
           <button
             type="button"
             onClick={handleParse}
             disabled={isParsing}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {isParsing ? 'Parsing…' : 'Parse file'}
+            {isParsing
+              ? 'Parsing…'
+              : material.parsingStatus === 'processing'
+                ? 'Retry parse'
+                : 'Parse file'}
           </button>
         </div>
       )}

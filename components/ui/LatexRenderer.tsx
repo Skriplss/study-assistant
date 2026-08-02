@@ -18,56 +18,64 @@ export function LatexRenderer({ content, className = '' }: LatexRendererProps) {
       return renderLatexInText(content)
     } catch (error) {
       console.error('LaTeX rendering error:', error)
-      return content
+      return escapeHtml(content)
     }
   }, [content])
 
-  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
+  return (
+    <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
+  )
+}
+
+const escapeHtml = (s: string) =>
+  s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+function renderMath(latex: string, displayMode: boolean): string {
+  try {
+    const rendered = katex.renderToString(latex.trim(), {
+      displayMode,
+      throwOnError: false,
+      errorColor: '#cc0000',
+      strict: false,
+    })
+    return displayMode
+      ? `<div class="katex-block my-4">${rendered}</div>`
+      : `<span class="katex-inline">${rendered}</span>`
+  } catch (error) {
+    console.warn('LaTeX render error:', error)
+    const source = displayMode ? `$$${latex}$$` : `$${latex}$`
+    return `<span class="katex-error">${escapeHtml(source)}</span>`
+  }
 }
 
 /**
- * Process text and render LaTeX expressions
- * Supports both inline ($...$) and block ($$...$$) LaTeX
+ * Process text and render LaTeX expressions ($...$ inline, $$...$$ block).
+ * Everything outside math segments goes into dangerouslySetInnerHTML, so it
+ * MUST be HTML-escaped — content is AI-derived from user uploads, and raw
+ * `<` both eats text and is an XSS vector.
  */
 function renderLatexInText(text: string): string {
   if (!text) return ''
 
-  let result = text
-  
-  // First, handle block LaTeX ($$...$$)
-  result = result.replace(/\$\$([\s\S]*?)\$\$/g, (match, latex) => {
-    try {
-      const rendered = katex.renderToString(latex.trim(), {
-        displayMode: true,
-        throwOnError: false,
-        errorColor: '#cc0000',
-        strict: false,
-      })
-      return `<div class="katex-block my-4">${rendered}</div>`
-    } catch (error) {
-      console.warn('Block LaTeX render error:', error)
-      return `<div class="katex-error">$$${latex}$$</div>`
-    }
-  })
+  const pattern = /\$\$([\s\S]*?)\$\$|\$([^$\n]+?)\$/g
+  let html = ''
+  let lastIndex = 0
+  let match: RegExpExecArray | null
 
-  // Then, handle inline LaTeX ($...$)
-  // Avoid matching already processed block LaTeX
-  result = result.replace(/\$([^\$\n]+?)\$/g, (match, latex) => {
-    try {
-      const rendered = katex.renderToString(latex.trim(), {
-        displayMode: false,
-        throwOnError: false,
-        errorColor: '#cc0000',
-        strict: false,
-      })
-      return `<span class="katex-inline">${rendered}</span>`
-    } catch (error) {
-      console.warn('Inline LaTeX render error:', error)
-      return `<span class="katex-error">$${latex}$</span>`
-    }
-  })
+  while ((match = pattern.exec(text)) !== null) {
+    html += escapeHtml(text.slice(lastIndex, match.index))
+    const [, block, inline] = match
+    html +=
+      block !== undefined ? renderMath(block, true) : renderMath(inline, false)
+    lastIndex = pattern.lastIndex
+  }
+  html += escapeHtml(text.slice(lastIndex))
 
-  return result
+  return html
 }
 
 /**

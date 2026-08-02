@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { QuizTaker } from '@/components/quizzes/QuizTaker'
 import { QuizResults } from '@/components/quizzes/QuizResults'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { useToast } from '@/components/ui/Toast'
 import type { Quiz, QuizResults as Results } from '@/lib/types'
 
 export default function QuizPage() {
@@ -14,6 +15,8 @@ export default function QuizPage() {
   const params = useParams()
   const quizId = params.id as string
   const { session } = useAuth()
+  const { toast } = useToast()
+  const retaking = useRef(false)
 
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [results, setResults] = useState<Results | null>(null)
@@ -43,6 +46,10 @@ export default function QuizPage() {
         if (resRes.ok) {
           const resultsData = await resRes.json()
           setResults(resultsData)
+        } else {
+          // Without results the page would fall through to QuizTaker with the
+          // completed quiz — every question locked with the old answers.
+          throw new Error('Failed to load results')
         }
       }
     } catch {
@@ -57,17 +64,34 @@ export default function QuizPage() {
   }
 
   const handleRetake = async () => {
-    if (!session) return
-    const res = await fetchWithAuth(session, `/api/quizzes/${quizId}/retake`, {
-      method: 'POST',
-    })
-    if (res.ok) {
+    if (!session || retaking.current) return
+    retaking.current = true
+    try {
+      const res = await fetchWithAuth(
+        session,
+        `/api/quizzes/${quizId}/retake`,
+        {
+          method: 'POST',
+        }
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast({
+          message: data.error || 'Failed to restart quiz',
+          variant: 'error',
+        })
+        return
+      }
       // Stay on the loader until the reopened quiz arrives — QuizTaker hydrates
       // its answers from the quiz prop once at mount, so mounting it against the
       // stale completed quiz would lock every question with the old answers.
       setLoading(true)
       setResults(null)
       await loadQuiz()
+    } catch {
+      toast({ message: 'Failed to restart quiz', variant: 'error' })
+    } finally {
+      retaking.current = false
     }
   }
 

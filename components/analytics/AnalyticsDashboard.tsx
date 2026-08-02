@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
 import {
@@ -35,6 +35,7 @@ export function AnalyticsDashboard() {
   const [data, setData] = useState<ProgressData | null>(null)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d')
   const [loading, setLoading] = useState(true)
+  const reqSeq = useRef(0)
 
   useEffect(() => {
     if (session) loadData()
@@ -43,6 +44,9 @@ export function AnalyticsDashboard() {
 
   const loadData = async () => {
     if (!session) return
+    // Requests for different ranges can resolve out of order — only the
+    // latest one may write state, or a slow "7d" overwrites a newer "1y".
+    const seq = ++reqSeq.current
     setLoading(true)
     try {
       const res = await fetchWithAuth(
@@ -51,12 +55,12 @@ export function AnalyticsDashboard() {
       )
       if (res.ok) {
         const progressData = await res.json()
-        setData(progressData)
+        if (seq === reqSeq.current) setData(progressData)
       }
     } catch (err) {
       console.error('Failed to load analytics:', err)
     } finally {
-      setLoading(false)
+      if (seq === reqSeq.current) setLoading(false)
     }
   }
 

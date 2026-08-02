@@ -14,7 +14,10 @@ export async function GET(
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -26,6 +29,8 @@ export async function GET(
     return NextResponse.json(results, { status: 200 })
   } catch (error) {
     console.error('Get results error:', error)
-    return errorResponse(error, 'Quiz results not found', 404)
+    // Not-found comes through as ApiError(404); anything else is a real 500 —
+    // forcing 404 here hid genuine failures.
+    return errorResponse(error, 'Failed to load quiz results')
   }
 }
