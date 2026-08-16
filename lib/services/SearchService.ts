@@ -11,10 +11,7 @@ export class SearchService {
   ): Promise<SearchResult[]> {
     const db = getSupabaseAdmin()
 
-    let dbQuery = db
-      .from('study_materials')
-      .select('*')
-      .eq('user_id', userId)
+    let dbQuery = db.from('study_materials').select('*').eq('user_id', userId)
 
     if (filters?.fileTypes && filters.fileTypes.length > 0) {
       dbQuery = dbQuery.in('file_type', filters.fileTypes)
@@ -25,17 +22,25 @@ export class SearchService {
     }
 
     // Push text matching into Postgres so we don't pull the whole library
-    // (with full parsed_content) into Node on every search. Sanitize terms to
-    // keep PostgREST's or() filter syntax intact.
+    // (with full parsed_content) into Node on every search.
     const terms = query
       .toLowerCase()
       .split(/\s+/)
-      .map((t) => t.replace(/[%,()\\*]/g, ''))
       .filter((t) => t.length > 2)
 
     if (terms.length > 0) {
+      // Quote the value rather than stripping characters out of it. A denylist of
+      // syntax characters is a bet that the list is complete; quoting is how
+      // PostgREST is specified to take a value containing commas or parens, and
+      // it keeps the user's search term intact instead of silently editing it.
+      const quote = (term: string) =>
+        `"%${term.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}%"`
+
       const orFilter = terms
-        .flatMap((t) => [`title.ilike.%${t}%`, `parsed_content.ilike.%${t}%`])
+        .flatMap((t) => [
+          `title.ilike.${quote(t)}`,
+          `parsed_content.ilike.${quote(t)}`,
+        ])
         .join(',')
       dbQuery = dbQuery.or(orFilter)
     }
@@ -48,10 +53,13 @@ export class SearchService {
     const { data: allTags } = await db
       .from('material_tags')
       .select('material_id, tag')
-      .in('material_id', materials.map(m => m.id))
+      .in(
+        'material_id',
+        materials.map((m) => m.id)
+      )
 
     const tagsByMaterial = new Map<string, string[]>()
-    allTags?.forEach(t => {
+    allTags?.forEach((t) => {
       if (!tagsByMaterial.has(t.material_id)) {
         tagsByMaterial.set(t.material_id, [])
       }
@@ -72,7 +80,11 @@ export class SearchService {
         filePath: m.file_path,
         sourceUrl: m.source_url ?? null,
         parsedContent: m.parsed_content,
-        parsingStatus: m.parsing_status as 'pending' | 'processing' | 'completed' | 'failed',
+        parsingStatus: m.parsing_status as
+          | 'pending'
+          | 'processing'
+          | 'completed'
+          | 'failed',
         parsingError: m.parsing_error,
         category: m.category,
         tags: materialTags,
@@ -82,7 +94,7 @@ export class SearchService {
       }
 
       const score = this.calculateRelevance(material, query, filters)
-      
+
       if (score > 0) {
         results.push({
           material,
@@ -98,7 +110,10 @@ export class SearchService {
 
   /** Significant search terms (>2 chars) from a raw query. */
   private static queryTerms(query: string): string[] {
-    return query.toLowerCase().split(' ').filter((t) => t.length > 2)
+    return query
+      .toLowerCase()
+      .split(' ')
+      .filter((t) => t.length > 2)
   }
 
   private static calculateRelevance(
@@ -116,18 +131,21 @@ export class SearchService {
     for (const term of terms) {
       if (title.includes(term)) score += 10
       if (content.includes(term)) score += 5
-      if (tags.some(tag => tag.toLowerCase().includes(term))) score += 15
+      if (tags.some((tag) => tag.toLowerCase().includes(term))) score += 15
     }
 
     if (filters?.tags && filters.tags.length > 0) {
-      const matchedTags = tags.filter(t => filters.tags?.includes(t))
+      const matchedTags = tags.filter((t) => filters.tags?.includes(t))
       score += matchedTags.length * 20
     }
 
     return score
   }
 
-  private static extractMatchedTerms(material: StudyMaterial, query: string): string[] {
+  private static extractMatchedTerms(
+    material: StudyMaterial,
+    query: string
+  ): string[] {
     const terms = this.queryTerms(query)
     const matched: string[] = []
 
@@ -136,8 +154,11 @@ export class SearchService {
     const tags = material.tags || []
 
     for (const term of terms) {
-      if (title.includes(term) || content.includes(term) || 
-          tags.some(tag => tag.toLowerCase().includes(term))) {
+      if (
+        title.includes(term) ||
+        content.includes(term) ||
+        tags.some((tag) => tag.toLowerCase().includes(term))
+      ) {
         matched.push(term)
       }
     }
@@ -145,20 +166,23 @@ export class SearchService {
     return [...new Set(matched)]
   }
 
-  private static generateSnippet(material: StudyMaterial, query: string): string {
+  private static generateSnippet(
+    material: StudyMaterial,
+    query: string
+  ): string {
     const content = material.parsedContent || material.title
     const terms = this.queryTerms(query)
-    
+
     for (const term of terms) {
       const index = content.toLowerCase().indexOf(term)
       if (index !== -1) {
         const start = Math.max(0, index - 60)
         const end = Math.min(content.length, index + 100)
         let snippet = content.substring(start, end)
-        
+
         if (start > 0) snippet = '...' + snippet
         if (end < content.length) snippet = snippet + '...'
-        
+
         return snippet
       }
     }

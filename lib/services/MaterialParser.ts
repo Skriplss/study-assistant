@@ -6,6 +6,7 @@ import { Readability } from '@mozilla/readability'
 import { parseHTML } from 'linkedom'
 import { AIService } from '@/lib/services/AIService'
 import { fetchYouTubeTranscript } from '@/lib/materials/youtube'
+import { fetchExternalPage } from '@/lib/materials/url-guard'
 import { detectMaterialLanguage } from '@/lib/ai/language-detection'
 import type { ParsedContent } from '@/lib/types'
 
@@ -369,14 +370,10 @@ export class MaterialParser {
    */
   static async parseURL(sourceUrl: string): Promise<ParsedContent> {
     try {
-      const res = await fetch(sourceUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; StudyAssistant/1.0)',
-        },
-      })
-      if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`)
-
-      const html = await res.text()
+      // Goes through the guard, never a bare fetch: the address is the user's and
+      // the extracted text comes back to them, so an unguarded fetch here reads
+      // whatever this server can reach. See lib/materials/url-guard.ts.
+      const html = await fetchExternalPage(sourceUrl)
       const { document } = parseHTML(html)
       const article = new Readability(document as any).parse()
 

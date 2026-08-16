@@ -5,6 +5,7 @@ import { ConversationService } from '@/lib/services/ConversationService'
 import { GlobalChatService } from '@/lib/services/GlobalChatService'
 import { getUserFriendlyAIError } from '@/lib/ai/errors'
 import { errorResponse } from '@/lib/api/response'
+import { registerAttempt, userKeys, AI_RULE } from '@/lib/auth/throttle'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -29,14 +30,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const retryAfter = await registerAttempt(userKeys('chat', user.id), AI_RULE)
+    if (retryAfter) {
+      return NextResponse.json(
+        { error: 'Too many requests. Give it a minute.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+      )
+    }
+
     const body = await req.json()
     const { message, history = [], materialId, conversationId } = body
 
     if (!message || typeof message !== 'string') {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Message is required' },
+        { status: 400 }
+      )
     }
 
-    const scopeId = typeof materialId === 'string' && materialId ? materialId : undefined
+    const scopeId =
+      typeof materialId === 'string' && materialId ? materialId : undefined
 
     // Resolve the conversation before answering, so the id can ride out on the
     // response headers — the body is a stream and can't carry it.
@@ -45,12 +58,24 @@ export async function POST(req: NextRequest) {
       await ConversationService.assertOwned(user.id, conversationId)
       activeConversationId = conversationId
     } else {
-      activeConversationId = await ConversationService.create(user.id, message, scopeId)
+      activeConversationId = await ConversationService.create(
+        user.id,
+        message,
+        scopeId
+      )
     }
 
-    await ConversationService.appendMessage(activeConversationId, 'user', message)
+    await ConversationService.appendMessage(
+      activeConversationId,
+      'user',
+      message
+    )
 
-    const { context, sources } = await GlobalChatService.buildContext(user.id, message, scopeId)
+    const { context, sources } = await GlobalChatService.buildContext(
+      user.id,
+      message,
+      scopeId
+    )
     const encoder = new TextEncoder()
     const sourcesHeader = encodeURIComponent(JSON.stringify(sources))
     const responseHeaders = {
@@ -65,7 +90,11 @@ export async function POST(req: NextRequest) {
       const canned =
         "I don't have any parsed materials to answer from yet. Upload and parse some materials first, then ask again."
 
-      await ConversationService.appendMessage(activeConversationId, 'assistant', canned)
+      await ConversationService.appendMessage(
+        activeConversationId,
+        'assistant',
+        canned
+      )
 
       const stream = new ReadableStream<Uint8Array>({
         start(controller) {
@@ -91,7 +120,8 @@ Instructions:
     messages.push({ role: 'user', content: systemPrompt })
     messages.push({
       role: 'assistant',
-      content: 'Understood. I will answer using only the provided sources and cite them by title.',
+      content:
+        'Understood. I will answer using only the provided sources and cite them by title.',
     })
     // Two exchanges. Every turn re-sends the sources, so history is the one part
     // of the prompt that grows unboundedly — at ~600 tokens per past answer, ten
@@ -129,7 +159,7 @@ Instructions:
               'assistant',
               answer,
               sources
-            ).catch(err => {
+            ).catch((err) => {
               console.error('Failed to persist assistant message:', err)
             })
           }

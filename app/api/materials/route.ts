@@ -5,6 +5,7 @@ import {
 } from '@/lib/services/MaterialService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { isYouTubeUrl } from '@/lib/materials/youtube'
+import { assertPublicHttpUrl } from '@/lib/materials/url-guard'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +15,10 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -24,7 +28,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ materials }, { status: 200 })
   } catch (error) {
     console.error('List materials error:', error)
-    return NextResponse.json({ error: 'Failed to list materials' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to list materials' },
+      { status: 500 }
+    )
   }
 }
 
@@ -43,7 +50,10 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await getSupabaseAdmin().auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -58,17 +68,26 @@ export async function POST(request: NextRequest) {
     const tags = Array.isArray(rawTags)
       ? rawTags.map((t: unknown) => String(t).trim()).filter(Boolean)
       : typeof rawTags === 'string'
-        ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        ? rawTags
+            .split(',')
+            .map((t: string) => t.trim())
+            .filter(Boolean)
         : undefined
 
     const category =
-      typeof body.category === 'string' && body.category ? body.category : undefined
+      typeof body.category === 'string' && body.category
+        ? body.category
+        : undefined
 
     // A file the browser has already uploaded straight to storage.
     if (typeof body.materialId === 'string' && body.materialId) {
-      const fileName = typeof body.fileName === 'string' ? body.fileName.trim() : ''
+      const fileName =
+        typeof body.fileName === 'string' ? body.fileName.trim() : ''
       if (!fileName) {
-        return NextResponse.json({ error: 'fileName is required' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'fileName is required' },
+          { status: 400 }
+        )
       }
 
       const material = await MaterialService.finalizeUpload(
@@ -89,25 +108,40 @@ export async function POST(request: NextRequest) {
     }
 
     // Link-based materials (YouTube / web URL) carry no file at all.
-    const sourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : ''
+    const sourceUrl =
+      typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : ''
     if (!sourceUrl) {
       return NextResponse.json(
         { error: 'materialId or sourceUrl is required' },
         { status: 400 }
       )
     }
+    // Reject an unreachable-by-policy address here rather than storing a row that
+    // only fails at parse time. The parser re-checks anyway (it is the real
+    // boundary — this row could be edited, and DNS can change under us).
     try {
-      new URL(sourceUrl)
-    } catch {
-      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+      await assertPublicHttpUrl(sourceUrl)
+    } catch (urlError) {
+      return NextResponse.json(
+        { error: urlError instanceof Error ? urlError.message : 'Invalid URL' },
+        { status: 400 }
+      )
     }
 
     const fileType = isYouTubeUrl(sourceUrl) ? 'youtube' : 'url'
-    const material = await MaterialService.createLinkMaterial(user.id, sourceUrl, fileType, {
-      title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : sourceUrl,
-      category,
-      tags,
-    })
+    const material = await MaterialService.createLinkMaterial(
+      user.id,
+      sourceUrl,
+      fileType,
+      {
+        title:
+          typeof body.title === 'string' && body.title.trim()
+            ? body.title.trim()
+            : sourceUrl,
+        category,
+        tags,
+      }
+    )
 
     return NextResponse.json({ material }, { status: 201 })
   } catch (error) {
@@ -115,6 +149,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
     console.error('Create material error:', error)
-    return NextResponse.json({ error: 'Failed to create material' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to create material' },
+      { status: 500 }
+    )
   }
 }
