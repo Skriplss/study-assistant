@@ -536,7 +536,12 @@ export class AIService {
       score: null,
       questions: questions.map((q: any, i: number): any => ({
         questionText: q.questionText,
-        questionType: q.questionType,
+        // Same reason as difficulty below: question_type is CHECK-constrained to
+        // these two. A model that answers "true_false" would fail the bulk
+        // insert, and PostgREST runs it as one transaction — so one stray value
+        // discards the whole generation the user just paid for.
+        questionType:
+          q.questionType === 'open_ended' ? 'open_ended' : 'multiple_choice',
         // Per-question difficulty is CHECK-constrained to easy/medium/hard in
         // the DB — 'mixed' (a legal quiz-level value) or a model-invented
         // variant would fail the whole questions insert.

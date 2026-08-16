@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAdmin, getSupabaseAuthClient } from '@/lib/supabase/server'
+import { getSupabaseAuthClient } from '@/lib/supabase/server'
 import { validatePassword } from '@/lib/auth/password-validation'
 import { applySessionCookies } from '@/lib/auth/session-cookies'
 import { attemptKeys, registerAttempt, SIGNUP_RULE } from '@/lib/auth/throttle'
@@ -72,17 +72,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create user profile
-    const { error: profileError } = await getSupabaseAdmin()
-      .from('user_profiles')
-      .insert({
-        id: data.user.id,
-        preferences: {},
-      })
-
-    if (profileError) {
-      console.error('Profile creation error:', profileError)
-    }
+    // The profile row is created by the on_auth_user_created trigger (see
+    // supabase/migrations/add_user_profile_trigger.sql). Doing it here as well
+    // covered only this route — Google sign-in never reaches it — and swallowed
+    // its own failure, which is how four accounts ended up without a profile.
 
     const response = NextResponse.json(
       {

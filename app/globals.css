@@ -31,8 +31,6 @@
 
     /* Borders & Inputs */
     --border: 216 210 199; /* Border color - warm */
-    --input: 216 210 199; /* Input borders - warm */
-    --ring: 162 78 50; /* Focus ring - terracotta */
 
     /* Status Colors */
     --destructive: 192 57 43; /* Error/danger - warm red */
@@ -66,8 +64,6 @@
 
     /* Borders & Inputs */
     --border: 66 60 51; /* Border color - warm */
-    --input: 51 47 41; /* Input borders */
-    --ring: 198 118 84; /* Focus ring - terracotta */
 
     /* Status Colors */
     --destructive: 212 80 63; /* Error/danger - warm red */
@@ -115,16 +111,6 @@
   .dark select option {
     background-color: rgb(36 33 29);
     color: rgb(237 234 228);
-  }
-}
-
-/* ============================================
-   UTILITY CLASSES
-   ============================================ */
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
   }
 }
 

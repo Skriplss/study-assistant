@@ -39,11 +39,19 @@ export default function ParsingStatus({ material }: ParsingStatusProps) {
   const config = statusConfig[parsingStatus]
 
   return (
-    <div className={`rounded px-2 py-1 text-xs font-medium inline-flex items-center gap-1.5 ${config.className}`}>
+    <div
+      className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium ${config.className}`}
+    >
       <span>{config.icon}</span>
       <span>{config.label}</span>
       {parsingStatus === 'processing' && (
-        <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
+        <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      )}
+      {/* The stored reason was computed into `description` and then never
+          rendered, so a failed material showed a bare "✕ Failed" and the server's
+          explanation — which it does write to parsing_error — stayed invisible. */}
+      {parsingStatus === 'failed' && (
+        <span className="font-normal opacity-90">— {config.description}</span>
       )}
     </div>
   )

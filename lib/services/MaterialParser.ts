@@ -11,8 +11,11 @@ import { detectMaterialLanguage } from '@/lib/ai/language-detection'
 import type { ParsedContent } from '@/lib/types'
 
 export class MaterialParser {
-  private static readonly PARSING_TIMEOUT = 60000 // 60 seconds for large files
-  private static readonly MAX_FILE_SIZE_FOR_TIMEOUT = 20 * 1024 * 1024 // 20MB
+  // Deliberately below the route's `maxDuration` of 60s: whichever limit fires
+  // first decides what the user sees, and only this one can write
+  // parsing_status: 'failed'. The platform killing the function first means the
+  // material stays 'processing' forever with nothing recorded.
+  private static readonly PARSING_TIMEOUT = 50_000
   // Groq vision rejects base64 images over ~4MB. Post-compression safety net —
   // prepareImageForOcr should keep everything far below this.
   private static readonly MAX_IMAGE_BYTES = 3.75 * 1024 * 1024
@@ -407,13 +410,13 @@ export class MaterialParser {
    */
   static async parseWithTimeout(
     parseFunction: () => Promise<ParsedContent>,
-    fileSize: number
+    _fileSize: number
   ): Promise<ParsedContent> {
-    // Only apply timeout for files under threshold
-    if (fileSize >= this.MAX_FILE_SIZE_FOR_TIMEOUT) {
-      return parseFunction()
-    }
-
+    // Large files used to be exempted from the timeout entirely — the ones most
+    // likely to need it got none, and a stalled 40MB scan simply ran until the
+    // platform killed the function, which skips the handler's catch and leaves
+    // the material stuck in 'processing'. The timeout exists precisely so that
+    // failure is recorded; it now applies to every size.
     return Promise.race([
       parseFunction(),
       new Promise<never>((_, reject) =>

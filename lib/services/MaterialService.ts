@@ -2,6 +2,7 @@ import 'server-only'
 
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { validateMaterialUpload } from '@/lib/materials/file-validation'
+import { normalizeTag, validateTag } from '@/lib/tags/tag-management'
 import type { StudyMaterial, MaterialMetadata } from '@/lib/types'
 
 type FileType = StudyMaterial['fileType']
@@ -19,12 +20,31 @@ export class MaterialValidationError extends Error {
   }
 }
 
+/**
+ * Build the rows for a material's tags, validating first.
+ *
+ * The rules were enforced only in TagInput, so the API accepted anything a
+ * non-browser caller sent: a tag over the column's 100 characters reached
+ * Postgres, raised 22001, and (in the update path) took the material's existing
+ * tags with it. Normalization used to differ here too — `trim().toLowerCase()`
+ * against the client's `normalizeTag`, which also collapses whitespace to
+ * hyphens — so the same tag was stored differently depending on the caller.
+ *
+ * Throws MaterialValidationError, i.e. the caller answers 400 rather than 500.
+ */
 function tagRows(materialId: string, tags: string[]) {
   // Dedupe after normalization — ["React", "react "] would otherwise produce
   // two identical rows and fail the UNIQUE(material_id, tag) constraint.
-  const normalized = new Set(
-    tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean)
-  )
+  const normalized = new Set<string>()
+
+  for (const tag of tags) {
+    const validation = validateTag(tag)
+    if (!validation.valid) {
+      throw new MaterialValidationError(validation.error ?? 'Invalid tag')
+    }
+    normalized.add(normalizeTag(tag))
+  }
+
   return Array.from(normalized, (tag) => ({ material_id: materialId, tag }))
 }
 
@@ -121,6 +141,10 @@ export class MaterialService {
       throw new MaterialValidationError(nameCheck.error)
     }
 
+    // Validate the tags here, not after the material row exists: a rejected tag
+    // would otherwise leave a created material behind alongside a 400.
+    const tags = tagRows(materialId, metadata.tags ?? [])
+
     const fileExtension = fileName.split('.').pop()?.toLowerCase() as FileType
 
     // Re-derive the path rather than accept one from the client: a forged path would
@@ -167,8 +191,14 @@ export class MaterialService {
       throw new Error(`Database error: ${dbError.message}`)
     }
 
-    if (metadata.tags && metadata.tags.length > 0) {
-      await db.from('material_tags').insert(tagRows(materialId, metadata.tags))
+    if (tags.length > 0) {
+      // Checked, not fired and forgotten: this used to swallow its error, so the
+      // route answered 201 and getMaterial honestly reported `tags: []` — a
+      // creation that looked successful with its tags quietly gone.
+      const { error: tagError } = await db.from('material_tags').insert(tags)
+      if (tagError) {
+        throw new Error(`Failed to insert tags: ${tagError.message}`)
+      }
     }
 
     return this.getMaterial(materialId)
@@ -183,6 +213,9 @@ export class MaterialService {
   ): Promise<StudyMaterial> {
     const db = getSupabaseAdmin()
     const materialId = crypto.randomUUID()
+
+    // Before the material row, so a rejected tag doesn't leave one behind.
+    const tags = tagRows(materialId, metadata.tags ?? [])
 
     const materialData = {
       id: materialId,
@@ -207,8 +240,12 @@ export class MaterialService {
       throw new Error(`Database error: ${dbError.message}`)
     }
 
-    if (metadata.tags && metadata.tags.length > 0) {
-      await db.from('material_tags').insert(tagRows(materialId, metadata.tags))
+    if (tags.length > 0) {
+      // Checked, not fired and forgotten — see finalizeUpload.
+      const { error: tagError } = await db.from('material_tags').insert(tags)
+      if (tagError) {
+        throw new Error(`Failed to insert tags: ${tagError.message}`)
+      }
     }
 
     return this.getMaterial(materialId)
@@ -235,6 +272,21 @@ export class MaterialService {
   }
 
   /** Cheap ownership lookup — avoids fetching the full material just to authz. */
+  /**
+   * Just the storage path. Delete and download both used getMaterial for this,
+   * which is `select('*')` plus a second query for tags — up to half a megabyte
+   * of document text fetched to read one string.
+   */
+  static async getMaterialFilePath(materialId: string): Promise<string | null> {
+    const db = getSupabaseAdmin()
+    const { data } = await db
+      .from('study_materials')
+      .select('file_path')
+      .eq('id', materialId)
+      .single()
+    return data?.file_path ?? null
+  }
+
   static async getMaterialOwner(materialId: string): Promise<string | null> {
     const db = getSupabaseAdmin()
     const { data } = await db
@@ -299,12 +351,16 @@ export class MaterialService {
     }
 
     if (updates.tags !== undefined) {
+      // Build (and validate) the replacement BEFORE deleting the current tags.
+      // The other order loses them for good: the delete commits on its own, so a
+      // rejected insert left the material with no tags at all and the caller
+      // holding a 500.
+      const rows = tagRows(materialId, updates.tags)
+
       await db.from('material_tags').delete().eq('material_id', materialId)
 
-      if (updates.tags.length > 0) {
-        const { error: tagError } = await db
-          .from('material_tags')
-          .insert(tagRows(materialId, updates.tags))
+      if (rows.length > 0) {
+        const { error: tagError } = await db.from('material_tags').insert(rows)
         if (tagError) {
           throw new Error(`Failed to insert tags: ${tagError.message}`)
         }
@@ -316,17 +372,14 @@ export class MaterialService {
 
   static async deleteMaterial(materialId: string): Promise<void> {
     const db = getSupabaseAdmin()
-    const material = await this.getMaterial(materialId)
+    const filePath = await this.getMaterialFilePath(materialId)
 
     // Link materials (youtube/url) have no stored file to remove.
-    if (material.filePath) {
-      const extractedPath = material.filePath.replace(
-        /original\.\w+$/,
-        'extracted.txt'
-      )
+    if (filePath) {
+      const extractedPath = filePath.replace(/original\.\w+$/, 'extracted.txt')
       const { error: storageError } = await db.storage
         .from(this.STORAGE_BUCKET)
-        .remove([material.filePath, extractedPath])
+        .remove([filePath, extractedPath])
 
       // Stop before dropping the row. These errors used to be discarded, so a
       // failed removal left the file behind while its only reference vanished —
@@ -351,15 +404,15 @@ export class MaterialService {
 
   static async downloadMaterial(materialId: string): Promise<Blob> {
     const db = getSupabaseAdmin()
-    const material = await this.getMaterial(materialId)
+    const filePath = await this.getMaterialFilePath(materialId)
 
-    if (!material.filePath) {
+    if (!filePath) {
       throw new Error('Material has no stored file (link-based source)')
     }
 
     const { data, error } = await db.storage
       .from(this.STORAGE_BUCKET)
-      .download(material.filePath)
+      .download(filePath)
 
     if (error || !data) {
       throw new Error(`Download failed: ${error?.message ?? 'unknown'}`)

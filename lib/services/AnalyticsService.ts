@@ -1,7 +1,12 @@
 import 'server-only'
 
 import { getSupabaseAdmin } from '@/lib/supabase/server'
-import type { ProgressData, ScoreDataPoint, TagPerformance, CategoryPerformance } from '@/lib/types'
+import type {
+  ProgressData,
+  ScoreDataPoint,
+  TagPerformance,
+  CategoryPerformance,
+} from '@/lib/types'
 
 export class AnalyticsService {
   static async recordQuizCompletion(
@@ -14,7 +19,7 @@ export class AnalyticsService {
   ): Promise<void> {
     const db = getSupabaseAdmin()
 
-    await db.from('progress_snapshots').insert({
+    const { error } = await db.from('progress_snapshots').insert({
       user_id: userId,
       quiz_id: quizId,
       material_id: materialId,
@@ -23,6 +28,17 @@ export class AnalyticsService {
       correct_count: correctCount,
       completed_at: new Date().toISOString(),
     })
+
+    // Thrown rather than logged-and-swallowed, even though the quiz is already
+    // scored by the time we get here. completeQuiz flips the status first and
+    // then early-returns on every later call, so a snapshot that fails once can
+    // never be written again — the attempt is gone from the user's history for
+    // good. That is worth a 500 the user recovers from by reloading (the results
+    // screen works: the score is saved) rather than a log line nobody reads.
+    // This is how the analytics RPC's 42703 stayed invisible for its whole life.
+    if (error) {
+      throw new Error(`Failed to record quiz completion: ${error.message}`)
+    }
   }
 
   static async getProgressData(
@@ -56,13 +72,15 @@ export class AnalyticsService {
       this.getPerformanceByCategory(userId, startDate),
     ])
 
-    const scores = snapshots?.map(s => s.score) || []
-    const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+    const scores = snapshots?.map((s) => s.score) || []
+    const avgScore =
+      scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
 
     return {
       totalMaterials: materials?.length || 0,
       totalQuizzes: quizzes?.length || 0,
-      totalQuestions: quizzes?.reduce((sum, q) => sum + q.total_questions, 0) || 0,
+      totalQuestions:
+        quizzes?.reduce((sum, q) => sum + q.total_questions, 0) || 0,
       averageScore: Math.round(avgScore * 10) / 10,
       scoreHistory: this.formatScoreHistory(snapshots || []),
       performanceByTag,
@@ -104,34 +122,49 @@ export class AnalyticsService {
           .gte('created_at', startDate.toISOString()),
       ])
 
-    const scores = scoreRows?.map(s => s.score) || []
-    const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+    const scores = scoreRows?.map((s) => s.score) || []
+    const avgScore =
+      scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
 
     return {
       totalMaterials: materialCount || 0,
       totalQuizzes: quizzes?.length || 0,
-      totalQuestions: quizzes?.reduce((sum, q) => sum + q.total_questions, 0) || 0,
+      totalQuestions:
+        quizzes?.reduce((sum, q) => sum + q.total_questions, 0) || 0,
       averageScore: Math.round(avgScore * 10) / 10,
     }
   }
 
   private static formatScoreHistory(snapshots: any[]): ScoreDataPoint[] {
-    return snapshots.map(s => ({
+    return snapshots.map((s) => ({
       date: s.completed_at,
       score: s.score,
       quizId: s.quiz_id,
     }))
   }
 
-  private static getPerformanceByTag(userId: string, startDate: Date): Promise<TagPerformance[]> {
-    return this.getPerformance('get_performance_by_tag', 'tag', userId, startDate)
+  private static getPerformanceByTag(
+    userId: string,
+    startDate: Date
+  ): Promise<TagPerformance[]> {
+    return this.getPerformance(
+      'get_performance_by_tag',
+      'tag',
+      userId,
+      startDate
+    )
   }
 
   private static getPerformanceByCategory(
     userId: string,
     startDate: Date
   ): Promise<CategoryPerformance[]> {
-    return this.getPerformance('get_performance_by_category', 'category', userId, startDate)
+    return this.getPerformance(
+      'get_performance_by_category',
+      'category',
+      userId,
+      startDate
+    )
   }
 
   private static async getPerformance<K extends 'tag' | 'category'>(
@@ -139,7 +172,15 @@ export class AnalyticsService {
     keyField: K,
     userId: string,
     startDate: Date
-  ): Promise<Array<Record<K, string> & { averageScore: number; quizCount: number; questionCount: number }>> {
+  ): Promise<
+    Array<
+      Record<K, string> & {
+        averageScore: number
+        quizCount: number
+        questionCount: number
+      }
+    >
+  > {
     const db = getSupabaseAdmin()
 
     const { data, error } = await db.rpc(rpc, {
@@ -161,7 +202,13 @@ export class AnalyticsService {
       averageScore: row.average_score,
       quizCount: row.quiz_count,
       questionCount: row.question_count,
-    })) as Array<Record<K, string> & { averageScore: number; quizCount: number; questionCount: number }>
+    })) as Array<
+      Record<K, string> & {
+        averageScore: number
+        quizCount: number
+        questionCount: number
+      }
+    >
   }
 
   private static getStartDate(range: string): Date {

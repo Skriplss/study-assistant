@@ -210,13 +210,6 @@ export interface GraphEdge {
   sharedConcepts: string[]
 }
 
-export interface Connection {
-  materialId1: string
-  materialId2: string
-  connectionStrength: number
-  sharedConcepts: string[]
-}
-
 // Analytics Types
 export interface ProgressData {
   totalMaterials: number

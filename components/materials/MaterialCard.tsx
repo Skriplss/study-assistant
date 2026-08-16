@@ -4,6 +4,7 @@ import { memo, useEffect, useState } from 'react'
 import type { StudyMaterial } from '@/lib/types'
 import { useAuth } from '@/lib/auth/session'
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth'
+import { useToast } from '@/components/ui/Toast'
 import TagInput from './TagInput'
 import CategorySelector from './CategorySelector'
 import ParsingStatus from './ParsingStatus'
@@ -49,6 +50,7 @@ function MaterialCard({
   onGenerateQuiz,
 }: MaterialCardProps) {
   const { session } = useAuth()
+  const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
   const [title, setTitle] = useState(material.title)
   const [category, setCategory] = useState(material.category ?? '')
@@ -61,11 +63,16 @@ function MaterialCard({
   const [currentMaterial, setCurrentMaterial] = useState(material)
 
   useEffect(() => {
+    setCurrentMaterial(material)
+    // Not while the user is typing. This used to resync unconditionally, so any
+    // refresh of the list (someone finishing an upload, a parse completing) threw
+    // away an open edit — and left the Save button sitting there, ready to write
+    // the old values back.
+    if (isEditing) return
     setTitle(material.title)
     setCategory(material.category ?? '')
     setTags(material.tags)
-    setCurrentMaterial(material)
-  }, [material])
+  }, [material, isEditing])
 
   const handleParse = async () => {
     if (!session) return
@@ -78,15 +85,23 @@ function MaterialCard({
       })
       if (response.ok) {
         // Success implies parsing completed — no second round-trip needed.
-        const updated = { ...currentMaterial, parsingStatus: 'completed' as const }
+        const updated = {
+          ...currentMaterial,
+          parsingStatus: 'completed' as const,
+        }
         setCurrentMaterial(updated)
         onEdit?.(updated)
       } else {
+        // Was console.error only: the button went back to "Parse" and nothing
+        // else happened, so the user just kept clicking it.
         const err = await response.json().catch(() => ({}))
-        console.error('Parse failed:', err)
+        toast({
+          message: err.details || err.error || 'Parsing failed',
+          variant: 'error',
+        })
       }
     } catch {
-      // ignore
+      toast({ message: 'Parsing failed', variant: 'error' })
     } finally {
       setIsParsing(false)
     }
@@ -167,27 +182,30 @@ function MaterialCard({
   }
 
   return (
-    <article className="border border-border rounded-lg p-4 bg-card hover:shadow-md transition-shadow">
+    <article className="rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-md">
       {/* Header with title and file type */}
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="flex items-start gap-2 flex-1 min-w-0">
-          <span className="inline-block px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded flex-shrink-0">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <span className="inline-block flex-shrink-0 rounded bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground">
             {FILE_TYPE_LABELS[currentMaterial.fileType]}
           </span>
-          
-          <div className="flex-1 min-w-0">
+
+          <div className="min-w-0 flex-1">
             {isEditing ? (
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-2 py-1 border border-border bg-background text-foreground rounded text-sm font-medium"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-sm font-medium text-foreground"
               />
             ) : (
-              <h3 className="font-semibold text-sm text-foreground truncate">{currentMaterial.title}</h3>
+              <h3 className="truncate text-sm font-semibold text-foreground">
+                {currentMaterial.title}
+              </h3>
             )}
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {formatFileSize(currentMaterial.fileSize)} · {formatDate(currentMaterial.createdAt)}
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {formatFileSize(currentMaterial.fileSize)} ·{' '}
+              {formatDate(currentMaterial.createdAt)}
             </p>
           </div>
         </div>
@@ -200,9 +218,11 @@ function MaterialCard({
 
       {/* Category and Tags */}
       {isEditing ? (
-        <div className="space-y-2 mb-3">
+        <div className="mb-3 space-y-2">
           <div>
-            <label className="block text-xs font-medium mb-1 text-foreground">Category</label>
+            <label className="mb-1 block text-xs font-medium text-foreground">
+              Category
+            </label>
             <CategorySelector
               value={category}
               onChange={setCategory}
@@ -211,7 +231,9 @@ function MaterialCard({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium mb-1 text-foreground">Tags</label>
+            <label className="mb-1 block text-xs font-medium text-foreground">
+              Tags
+            </label>
             <TagInput
               tags={tags}
               onChange={setTags}
@@ -237,7 +259,7 @@ function MaterialCard({
               {material.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs"
+                  className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary"
                 >
                   {tag}
                 </span>
@@ -248,14 +270,14 @@ function MaterialCard({
       )}
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border">
+      <div className="flex flex-wrap gap-1.5 border-t border-border pt-2">
         {isEditing ? (
           <>
             <button
               type="button"
               onClick={handleSave}
               disabled={isSaving || !title.trim()}
-              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+              className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {isSaving ? 'Saving…' : 'Save'}
             </button>
@@ -263,7 +285,7 @@ function MaterialCard({
               type="button"
               onClick={handleCancelEdit}
               disabled={isSaving}
-              className="px-3 py-1.5 text-xs font-medium border border-border text-foreground rounded hover:bg-accent"
+              className="rounded border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
             >
               Cancel
             </button>
@@ -273,7 +295,7 @@ function MaterialCard({
             <button
               type="button"
               onClick={() => setIsEditing(true)}
-              className="px-3 py-1.5 text-xs font-medium border border-border text-foreground rounded hover:bg-accent"
+              className="rounded border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
               title="Edit"
             >
               Edit
@@ -282,26 +304,34 @@ function MaterialCard({
               <button
                 type="button"
                 onClick={handleParse}
-                disabled={isParsing || currentMaterial.parsingStatus === 'processing'}
-                className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+                disabled={
+                  isParsing || currentMaterial.parsingStatus === 'processing'
+                }
+                className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 title="Parse material"
               >
-                {isParsing || currentMaterial.parsingStatus === 'processing' ? 'Parsing…' : 'Parse'}
+                {isParsing || currentMaterial.parsingStatus === 'processing'
+                  ? 'Parsing…'
+                  : 'Parse'}
               </button>
             )}
             <button
               type="button"
               onClick={() => onGenerateQuiz(currentMaterial.id)}
               disabled={currentMaterial.parsingStatus !== 'completed'}
-              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={currentMaterial.parsingStatus !== 'completed' ? 'Parse the file first' : 'Generate quiz'}
+              className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              title={
+                currentMaterial.parsingStatus !== 'completed'
+                  ? 'Parse the file first'
+                  : 'Generate quiz'
+              }
             >
               Quiz
             </button>
             <button
               type="button"
               onClick={() => onDelete(currentMaterial.id)}
-              className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded hover:bg-destructive hover:text-destructive-foreground ml-auto"
+              className="ml-auto rounded border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
               title="Delete"
             >
               Delete

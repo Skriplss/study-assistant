@@ -4,16 +4,24 @@ import { MaterialService } from '@/lib/services/MaterialService'
 import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { errorResponse } from '@/lib/api/response'
 
+// Without this the platform's default cut the function off before
+// MaterialParser's own timeout could fire, so the catch that writes
+// parsing_status: 'failed' never ran and the material sat in 'processing',
+// unretryable for five minutes. 60 rather than more because that is the ceiling
+// this project is known to deploy under (app/api/materials/route.ts uses it);
+// PARSING_TIMEOUT is set below it so the internal timeout is the one that wins.
+export const maxDuration = 60
+
 export async function POST(request: NextRequest) {
   let _materialId: string | undefined = undefined
   try {
     // Get user ID from session
     const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.substring(7)
     const {
       data: { user },
       error: authError,

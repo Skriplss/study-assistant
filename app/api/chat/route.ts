@@ -12,6 +12,9 @@ interface ChatMessage {
   content: string
 }
 
+/** Generous for a question, far below what would blow the shared TPM budget. */
+const MAX_MESSAGE_CHARS = 4000
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization')
@@ -47,6 +50,36 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Everything below is client-supplied and goes into a prompt billed against
+    // an 8k-token-per-minute budget shared by every user at once, so size is not
+    // a cosmetic concern here.
+    if (message.length > MAX_MESSAGE_CHARS) {
+      return NextResponse.json(
+        { error: 'That message is too long.' },
+        { status: 400 }
+      )
+    }
+
+    // `history` was spread into the messages array untyped: a string spread into
+    // four bare characters and reached Groq as malformed turns, a number threw
+    // on .slice and became a 500.
+    const priorTurns = Array.isArray(history)
+      ? history
+          .filter(
+            (turn): turn is ChatMessage =>
+              !!turn &&
+              typeof turn === 'object' &&
+              typeof (turn as ChatMessage).content === 'string' &&
+              ((turn as ChatMessage).role === 'user' ||
+                (turn as ChatMessage).role === 'assistant')
+          )
+          .slice(-4)
+          .map((turn) => ({
+            role: turn.role,
+            content: turn.content.slice(0, MAX_MESSAGE_CHARS),
+          }))
+      : []
 
     const scopeId =
       typeof materialId === 'string' && materialId ? materialId : undefined
@@ -126,7 +159,7 @@ Instructions:
     // Two exchanges. Every turn re-sends the sources, so history is the one part
     // of the prompt that grows unboundedly — at ~600 tokens per past answer, ten
     // messages cost more TPM than the sources themselves.
-    messages.push(...(history as ChatMessage[]).slice(-4))
+    messages.push(...priorTurns)
     messages.push({ role: 'user', content: message })
 
     const stream = new ReadableStream<Uint8Array>({

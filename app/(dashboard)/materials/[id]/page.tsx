@@ -62,11 +62,15 @@ export default function MaterialDetailPage() {
       })
       const data = await response.json()
 
-      if (!response.ok) {
-        setError(data.details || data.error || 'Parsing failed')
-      }
+      const failure = response.ok
+        ? null
+        : data.details || data.error || 'Parsing failed'
 
+      // Set the message AFTER the reload, not before: loadMaterial opens with
+      // `setError('')`, so the old order wrote the reason and then wiped it one
+      // line later. The reason never reached the screen.
       await loadMaterial()
+      if (failure) setError(failure)
     } catch {
       setError('Parsing failed')
     } finally {
