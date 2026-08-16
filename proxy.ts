@@ -147,7 +147,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-
-// Increase body size limit to 100MB
-export const maxDuration = 60
-export const bodySizeLimit = '100mb'

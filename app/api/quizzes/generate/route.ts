@@ -7,11 +7,11 @@ import { registerAttempt, userKeys, AI_RULE } from '@/lib/auth/throttle'
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.substring(7)
     const {
       data: { user },
       error: authError,

@@ -10,9 +10,11 @@ const MAX_MESSAGE = 5000
 /** Resolve the Bearer user, or null. */
 async function getUser(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (!authHeader) return null
-  const token = authHeader.replace('Bearer ', '')
-  const { data: { user } } = await getSupabaseAdmin().auth.getUser(token)
+  if (!authHeader?.startsWith('Bearer ')) return null
+  const token = authHeader.substring(7)
+  const {
+    data: { user },
+  } = await getSupabaseAdmin().auth.getUser(token)
   return user
 }
 
@@ -28,16 +30,22 @@ export async function POST(request: NextRequest) {
     const message = typeof body.message === 'string' ? body.message.trim() : ''
 
     if (!message) {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Message is required' },
+        { status: 400 }
+      )
     }
 
-    const { error } = await getSupabaseAdmin().from('feedback').insert({
-      user_id: user.id,
-      type,
-      message: message.slice(0, MAX_MESSAGE),
-      page_url: typeof body.pageUrl === 'string' ? body.pageUrl.slice(0, 500) : null,
-      user_agent: request.headers.get('user-agent')?.slice(0, 500) ?? null,
-    })
+    const { error } = await getSupabaseAdmin()
+      .from('feedback')
+      .insert({
+        user_id: user.id,
+        type,
+        message: message.slice(0, MAX_MESSAGE),
+        page_url:
+          typeof body.pageUrl === 'string' ? body.pageUrl.slice(0, 500) : null,
+        user_agent: request.headers.get('user-agent')?.slice(0, 500) ?? null,
+      })
 
     if (error) throw new Error(error.message)
 
@@ -52,8 +60,10 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const user = await getUser(request)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!isAdmin(user.email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!user)
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!isAdmin(user.email))
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { data, error } = await getSupabaseAdmin()
       .from('feedback')
@@ -73,12 +83,17 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const user = await getUser(request)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!isAdmin(user.email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!user)
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!isAdmin(user.email))
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const body = await request.json()
     if (!body.id || !STATUSES.includes(body.status)) {
-      return NextResponse.json({ error: 'Invalid id or status' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Invalid id or status' },
+        { status: 400 }
+      )
     }
 
     const { error } = await getSupabaseAdmin()

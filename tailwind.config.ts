@@ -41,13 +41,10 @@ const config: Config = {
           foreground: 'rgb(var(--destructive-foreground) / <alpha-value>)',
         },
         border: 'rgb(var(--border) / <alpha-value>)',
-        input: 'rgb(var(--input) / <alpha-value>)',
-        ring: 'rgb(var(--ring) / <alpha-value>)',
       },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
       },
     },
   },

@@ -82,7 +82,7 @@ const nextConfig = {
 
   experimental: {
     // Optimize package imports
-    optimizePackageImports: ['react-force-graph-2d', 'recharts', 'groq-sdk'],
+    optimizePackageImports: ['react-force-graph-2d', 'recharts'],
     // Increase proxy (ex-middleware) body size limit
     proxyClientMaxBodySize: '100mb',
   },

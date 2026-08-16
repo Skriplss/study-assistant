@@ -8,11 +8,11 @@ type RouteParams = { params: Promise<{ id: string }> }
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.substring(7)
     const {
       data: { user },
       error: authError,
@@ -40,11 +40,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.substring(7)
     const {
       data: { user },
       error: authError,
@@ -92,11 +92,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.substring(7)
     const {
       data: { user },
       error: authError,
