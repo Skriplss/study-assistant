@@ -272,6 +272,21 @@ export class MaterialService {
   }
 
   /** Cheap ownership lookup — avoids fetching the full material just to authz. */
+  /**
+   * Just the storage path. Delete and download both used getMaterial for this,
+   * which is `select('*')` plus a second query for tags — up to half a megabyte
+   * of document text fetched to read one string.
+   */
+  static async getMaterialFilePath(materialId: string): Promise<string | null> {
+    const db = getSupabaseAdmin()
+    const { data } = await db
+      .from('study_materials')
+      .select('file_path')
+      .eq('id', materialId)
+      .single()
+    return data?.file_path ?? null
+  }
+
   static async getMaterialOwner(materialId: string): Promise<string | null> {
     const db = getSupabaseAdmin()
     const { data } = await db
@@ -357,17 +372,14 @@ export class MaterialService {
 
   static async deleteMaterial(materialId: string): Promise<void> {
     const db = getSupabaseAdmin()
-    const material = await this.getMaterial(materialId)
+    const filePath = await this.getMaterialFilePath(materialId)
 
     // Link materials (youtube/url) have no stored file to remove.
-    if (material.filePath) {
-      const extractedPath = material.filePath.replace(
-        /original\.\w+$/,
-        'extracted.txt'
-      )
+    if (filePath) {
+      const extractedPath = filePath.replace(/original\.\w+$/, 'extracted.txt')
       const { error: storageError } = await db.storage
         .from(this.STORAGE_BUCKET)
-        .remove([material.filePath, extractedPath])
+        .remove([filePath, extractedPath])
 
       // Stop before dropping the row. These errors used to be discarded, so a
       // failed removal left the file behind while its only reference vanished —
@@ -392,15 +404,15 @@ export class MaterialService {
 
   static async downloadMaterial(materialId: string): Promise<Blob> {
     const db = getSupabaseAdmin()
-    const material = await this.getMaterial(materialId)
+    const filePath = await this.getMaterialFilePath(materialId)
 
-    if (!material.filePath) {
+    if (!filePath) {
       throw new Error('Material has no stored file (link-based source)')
     }
 
     const { data, error } = await db.storage
       .from(this.STORAGE_BUCKET)
-      .download(material.filePath)
+      .download(filePath)
 
     if (error || !data) {
       throw new Error(`Download failed: ${error?.message ?? 'unknown'}`)

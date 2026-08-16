@@ -31,8 +31,25 @@ function makeQuery(data: any) {
 
 const searchMock = SearchService.search as jest.Mock
 
-function searchResult(id: string, title: string, content: string | null) {
-  return { material: { id, title, parsedContent: content }, relevanceScore: 1, matchedTerms: [], snippet: '' }
+/**
+ * A search hit as SearchService now returns it: ranking metadata and no document
+ * text. The text is fetched afterwards, only for the hits that survive ranking —
+ * see `contentRows` below.
+ */
+function searchResult(id: string, title: string) {
+  return {
+    material: { id, title, parsedContent: null, parsingStatus: 'completed' },
+    relevanceScore: 1,
+    matchedTerms: [],
+    snippet: '',
+  }
+}
+
+/** Mock the follow-up fetch that loads text for the ranked material ids. */
+function contentRows(
+  rows: { id: string; title: string; parsed_content: string | null }[]
+) {
+  mockDb.from.mockReturnValue(makeQuery(rows))
 }
 
 beforeEach(() => {
@@ -42,10 +59,18 @@ beforeEach(() => {
 describe('GlobalChatService.buildContext — scoped to a single material', () => {
   it('builds a single-source context for the given material', async () => {
     mockDb.from.mockReturnValue(
-      makeQuery({ id: 'm1', title: 'Photosynthesis', parsed_content: 'light reactions happen here' })
+      makeQuery({
+        id: 'm1',
+        title: 'Photosynthesis',
+        parsed_content: 'light reactions happen here',
+      })
     )
 
-    const { context, sources } = await GlobalChatService.buildContext('user-1', 'how does it work', 'm1')
+    const { context, sources } = await GlobalChatService.buildContext(
+      'user-1',
+      'how does it work',
+      'm1'
+    )
 
     expect(sources).toEqual([{ id: 'm1', title: 'Photosynthesis' }])
     expect(context).toContain('[Source 1: Photosynthesis]')
@@ -57,13 +82,19 @@ describe('GlobalChatService.buildContext — scoped to a single material', () =>
   it('returns empty when the scoped material is missing or not owned', async () => {
     mockDb.from.mockReturnValue(makeQuery(null))
 
-    const result = await GlobalChatService.buildContext('user-1', 'q', 'missing-id')
+    const result = await GlobalChatService.buildContext(
+      'user-1',
+      'q',
+      'missing-id'
+    )
 
     expect(result).toEqual({ context: '', sources: [] })
   })
 
   it('returns empty when the scoped material has no parsed content', async () => {
-    mockDb.from.mockReturnValue(makeQuery({ id: 'm1', title: 'Doc', parsed_content: null }))
+    mockDb.from.mockReturnValue(
+      makeQuery({ id: 'm1', title: 'Doc', parsed_content: null })
+    )
 
     const result = await GlobalChatService.buildContext('user-1', 'q', 'm1')
 
@@ -74,11 +105,18 @@ describe('GlobalChatService.buildContext — scoped to a single material', () =>
 describe('GlobalChatService.buildContext — across all materials', () => {
   it('ranks via search and labels each source in order', async () => {
     searchMock.mockResolvedValue([
-      searchResult('a', 'Alpha', 'alpha content'),
-      searchResult('b', 'Beta', 'beta content'),
+      searchResult('a', 'Alpha'),
+      searchResult('b', 'Beta'),
+    ])
+    contentRows([
+      { id: 'a', title: 'Alpha', parsed_content: 'alpha content' },
+      { id: 'b', title: 'Beta', parsed_content: 'beta content' },
     ])
 
-    const { context, sources } = await GlobalChatService.buildContext('user-1', 'overview')
+    const { context, sources } = await GlobalChatService.buildContext(
+      'user-1',
+      'overview'
+    )
 
     expect(sources).toEqual([
       { id: 'a', title: 'Alpha' },
@@ -90,8 +128,12 @@ describe('GlobalChatService.buildContext — across all materials', () => {
 
   it('skips search hits that have no parsed content', async () => {
     searchMock.mockResolvedValue([
-      searchResult('a', 'Alpha', null),
-      searchResult('b', 'Beta', 'beta content'),
+      searchResult('a', 'Alpha'),
+      searchResult('b', 'Beta'),
+    ])
+    contentRows([
+      { id: 'a', title: 'Alpha', parsed_content: null },
+      { id: 'b', title: 'Beta', parsed_content: 'beta content' },
     ])
 
     const { sources } = await GlobalChatService.buildContext('user-1', 'q')
@@ -101,12 +143,38 @@ describe('GlobalChatService.buildContext — across all materials', () => {
 
   it('caps the number of sources at 4', async () => {
     searchMock.mockResolvedValue(
-      Array.from({ length: 6 }, (_, i) => searchResult(`m${i}`, `Title ${i}`, `content ${i}`))
+      Array.from({ length: 6 }, (_, i) => searchResult(`m${i}`, `Title ${i}`))
+    )
+    contentRows(
+      Array.from({ length: 6 }, (_, i) => ({
+        id: `m${i}`,
+        title: `Title ${i}`,
+        parsed_content: `content ${i}`,
+      }))
     )
 
     const { sources } = await GlobalChatService.buildContext('user-1', 'q')
 
     expect(sources).toHaveLength(4)
+  })
+
+  it('fetches the text of only the materials it kept', async () => {
+    searchMock.mockResolvedValue(
+      Array.from({ length: 6 }, (_, i) => searchResult(`m${i}`, `Title ${i}`))
+    )
+    const query = makeQuery(
+      Array.from({ length: 4 }, (_, i) => ({
+        id: `m${i}`,
+        title: `Title ${i}`,
+        parsed_content: `content ${i}`,
+      }))
+    )
+    mockDb.from.mockReturnValue(query)
+
+    await GlobalChatService.buildContext('user-1', 'q')
+
+    // The whole point of the change: four documents are loaded, not the library.
+    expect(query.in).toHaveBeenCalledWith('id', ['m0', 'm1', 'm2', 'm3'])
   })
 
   it('falls back to recent materials when search finds nothing', async () => {
@@ -118,7 +186,10 @@ describe('GlobalChatService.buildContext — across all materials', () => {
       ])
     )
 
-    const { context, sources } = await GlobalChatService.buildContext('user-1', 'summarize everything')
+    const { context, sources } = await GlobalChatService.buildContext(
+      'user-1',
+      'summarize everything'
+    )
 
     expect(sources).toEqual([
       { id: 'r1', title: 'Recent One' },

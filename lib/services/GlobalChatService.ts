@@ -63,7 +63,7 @@ export class GlobalChatService {
     const blocks: string[] = []
     const sources: ChatSource[] = []
 
-    picked.forEach(m => {
+    picked.forEach((m) => {
       const passage = selectRelevantContent(m.content, message, perMaterial)
       if (!passage) return
       sources.push({ id: m.id, title: m.title })
@@ -78,13 +78,33 @@ export class GlobalChatService {
     message: string
   ): Promise<{ id: string; title: string; content: string }[]> {
     const results = await SearchService.search(userId, message)
-    return results
-      .filter(r => r.material.parsedContent)
+    const ranked = results
+      .filter((r) => r.material.parsingStatus === 'completed')
       .slice(0, MAX_SOURCES)
-      .map(r => ({
-        id: r.material.id,
-        title: r.material.title,
-        content: r.material.parsedContent as string,
+
+    if (ranked.length === 0) return []
+
+    // The text is fetched here, for the handful that survived ranking, instead of
+    // for every candidate the search touched. Ranking used to load the whole
+    // library (megabytes) to keep four documents of it.
+    const db = getSupabaseAdmin()
+    const { data } = await db
+      .from('study_materials')
+      .select('id, title, parsed_content')
+      .in(
+        'id',
+        ranked.map((r) => r.material.id)
+      )
+
+    const byId = new Map(data?.map((row) => [row.id, row]) ?? [])
+
+    return ranked
+      .map((r) => byId.get(r.material.id))
+      .filter((row) => row?.parsed_content)
+      .map((row) => ({
+        id: row!.id,
+        title: row!.title,
+        content: row!.parsed_content as string,
       }))
   }
 
@@ -102,7 +122,11 @@ export class GlobalChatService {
       .single()
 
     if (!data?.parsed_content) return null
-    return { id: data.id, title: data.title, content: data.parsed_content as string }
+    return {
+      id: data.id,
+      title: data.title,
+      content: data.parsed_content as string,
+    }
   }
 
   private static async recentMaterials(
@@ -118,7 +142,7 @@ export class GlobalChatService {
       .order('created_at', { ascending: false })
       .limit(MAX_SOURCES)
 
-    return (data ?? []).map(m => ({
+    return (data ?? []).map((m) => ({
       id: m.id,
       title: m.title,
       content: m.parsed_content as string,

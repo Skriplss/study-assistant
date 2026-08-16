@@ -3,12 +3,18 @@ import type { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 // Protected routes that require authentication.
-// UI routes are listed so an unauthenticated hit redirects to login instead of
-// flashing an empty shell. Listing an API route only buys an earlier 401 — each
-// one re-verifies the Bearer token itself (see the note in the handler) and is
-// the real boundary. /api/chat and /api/feedback are the two that were never
-// added; they work on the Bearer alone, and pulling them under the cookie gate
-// now would couple them to it for no security gain.
+//
+// UI routes only. An unauthenticated hit redirects to login instead of flashing
+// an empty shell — that is the whole job of this list.
+//
+// API routes used to be listed too, and it cost every protected call a second
+// verification: this ran supabase.auth.getUser (a network round-trip) and then
+// the handler ran it again, serially, before touching any data. The comment that
+// used to sit here said it plainly — listing an API route "only buys an earlier
+// 401" — because each handler re-verifies the Bearer itself and is the real
+// boundary. Paying ~40ms on every request for a slightly earlier 401 is not a
+// trade worth making, and /api/chat and /api/feedback never joined the list
+// anyway, so the guarantee was never uniform to begin with.
 const protectedRoutes = [
   '/dashboard',
   '/materials',
@@ -17,14 +23,6 @@ const protectedRoutes = [
   '/graph',
   '/chat',
   '/feedback',
-  '/api/materials',
-  '/api/tags',
-  '/api/categories',
-  '/api/quizzes',
-  '/api/review',
-  '/api/conversations',
-  '/api/graph',
-  '/api/analytics',
 ]
 
 // Public routes that don't require authentication
@@ -51,13 +49,21 @@ export async function proxy(request: NextRequest) {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } }
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+            detectSessionInUrl: false,
+          },
+        }
       )
       const { data } = await supabase.auth.getUser(accessToken)
       authed = !!data.user
     }
     if (!authed && refreshToken) authed = true
-    return NextResponse.redirect(new URL(authed ? '/dashboard' : '/auth/login', request.url))
+    return NextResponse.redirect(
+      new URL(authed ? '/dashboard' : '/auth/login', request.url)
+    )
   }
 
   // Check if the route is protected
@@ -65,9 +71,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith(route)
   )
 
-  const isPublicRoute = publicRoutes.some((route) =>
-    pathname.startsWith(route)
-  )
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
 
   // Allow public routes
   if (isPublicRoute && !isProtectedRoute) {
@@ -120,10 +124,7 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL('/auth/login', request.url))
       }
       // Return 401 for API routes
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Add user ID to headers for API routes (best-effort; only when verified).
