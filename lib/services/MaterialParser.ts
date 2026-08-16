@@ -1,4 +1,3 @@
-import pdfParse from 'pdf-parse'
 import sharp from 'sharp'
 import MarkdownIt from 'markdown-it'
 import officeParser from 'officeparser'
@@ -7,6 +6,7 @@ import { parseHTML } from 'linkedom'
 import { AIService } from '@/lib/services/AIService'
 import { fetchYouTubeTranscript } from '@/lib/materials/youtube'
 import { fetchExternalPage } from '@/lib/materials/url-guard'
+import { extractPdfText } from '@/lib/materials/pdf-text'
 import { detectMaterialLanguage } from '@/lib/ai/language-detection'
 import type { ParsedContent } from '@/lib/types'
 
@@ -53,11 +53,7 @@ export class MaterialParser {
    */
   static async parsePDF(buffer: ArrayBuffer): Promise<ParsedContent> {
     try {
-      const data = await pdfParse(Buffer.from(buffer), {
-        // Extract all pages
-        max: 0, // 0 means no limit
-        version: 'v2.0.550', // Use latest version
-      })
+      const data = await extractPdfText(buffer)
 
       // Clean the extracted text
       const cleanedText = this.cleanText(data.text)
@@ -76,11 +72,10 @@ export class MaterialParser {
       return {
         text: cleanedText,
         metadata: {
-          pageCount: data.numpages,
+          pageCount: data.pageCount,
           wordCount: cleanedText.split(/\s+/).filter(Boolean).length,
           structure: {
             info: data.info,
-            metadata: data.metadata,
             lineCount: lines.length,
             paragraphCount: paragraphs.length,
             averageWordsPerParagraph: Math.round(
