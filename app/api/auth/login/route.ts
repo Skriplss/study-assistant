@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin, getSupabaseAuthClient } from '@/lib/supabase/server'
 import { applySessionCookies } from '@/lib/auth/session-cookies'
+import {
+  attemptKeys,
+  registerAttempt,
+  clearAttempts,
+  emailKeyOnly,
+  LOGIN_RULE,
+} from '@/lib/auth/throttle'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +19,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
+      )
+    }
+
+    // Count the attempt BEFORE asking Supabase, so a burst of parallel guesses
+    // can't all slip past on the same pre-read count.
+    const throttleKeys = attemptKeys('login', request, email)
+    const retryAfter = await registerAttempt(throttleKeys, LOGIN_RULE)
+    if (retryAfter) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
       )
     }
 
@@ -36,6 +54,12 @@ export async function POST(request: NextRequest) {
     if (!data.user || !data.session) {
       return NextResponse.json({ error: 'Login failed' }, { status: 401 })
     }
+
+    // Right password — forget this account's failures, so a few typos before it
+    // don't stack up toward a lockout across the day. The IP counter deliberately
+    // survives: clearing it would hand anyone with one working account a way to
+    // reset their guessing budget against everyone else's.
+    await clearAttempts(emailKeyOnly(throttleKeys))
 
     // Get user profile
     const { data: profile } = await getSupabaseAdmin()

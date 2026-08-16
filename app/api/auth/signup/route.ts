@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin, getSupabaseAuthClient } from '@/lib/supabase/server'
 import { validatePassword } from '@/lib/auth/password-validation'
 import { applySessionCookies } from '@/lib/auth/session-cookies'
+import { attemptKeys, registerAttempt, SIGNUP_RULE } from '@/lib/auth/throttle'
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,6 +32,19 @@ export async function POST(request: NextRequest) {
           details: passwordValidation.errors,
         },
         { status: 400 }
+      )
+    }
+
+    // Throttled on the address alone — the email is new by definition, so there
+    // is no account to protect here, only bulk registration to slow down.
+    const retryAfter = await registerAttempt(
+      attemptKeys('signup', request),
+      SIGNUP_RULE
+    )
+    if (retryAfter) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
       )
     }
 

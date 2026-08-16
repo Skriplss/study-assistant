@@ -517,6 +517,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clear_auth_attempts: {
+        Args: { p_keys: string[] }
+        Returns: undefined
+      }
+      register_auth_attempt: {
+        Args: {
+          p_block: string
+          p_keys: string[]
+          p_limit: number
+          p_window: string
+        }
+        Returns: string | null
+      }
       get_performance_by_category: {
         Args: { p_start_date: string; p_user_id: string }
         Returns: {
