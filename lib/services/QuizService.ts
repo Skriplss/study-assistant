@@ -156,6 +156,11 @@ export class QuizService {
       db.from('answers').select('*').eq('quiz_id', quizId),
     ])
 
+    // The answer key only goes out once there is nothing left to answer. While a
+    // quiz is in progress this payload is the quiz *paper* — shipping the answers
+    // with it made every score and every review interval self-reported.
+    const finished = quiz.status === 'completed'
+
     return {
       id: quiz.id,
       userId: quiz.user_id,
@@ -176,8 +181,8 @@ export class QuizService {
         questionType: q.question_type as 'multiple_choice' | 'open_ended',
         difficulty: (q.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
         options: Array.isArray(q.options) ? (q.options as string[]) : null,
-        correctAnswer: q.correct_answer,
-        explanation: q.explanation,
+        correctAnswer: finished ? q.correct_answer : null,
+        explanation: finished ? q.explanation : null,
         orderIndex: q.order_index,
       })),
       answers: (answers || []).map(mapAnswer),

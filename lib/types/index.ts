@@ -4,7 +4,16 @@ export interface StudyMaterial {
   userId: string
   title: string
   fileName: string
-  fileType: 'pdf' | 'txt' | 'md' | 'pptx' | 'png' | 'jpg' | 'jpeg' | 'youtube' | 'url'
+  fileType:
+    | 'pdf'
+    | 'txt'
+    | 'md'
+    | 'pptx'
+    | 'png'
+    | 'jpg'
+    | 'jpeg'
+    | 'youtube'
+    | 'url'
   fileSize: number
   filePath: string | null
   sourceUrl: string | null
@@ -44,7 +53,7 @@ export interface Quiz {
   totalQuestions: number
   status: 'draft' | 'in_progress' | 'completed'
   score: number | null
-  questions: Question[]
+  questions: QuizQuestion[]
   answers?: Answer[]
   completedAt: string | null
   createdAt: string
@@ -74,6 +83,20 @@ export interface Question {
   correctAnswer: string
   explanation: string | null
   orderIndex: number
+}
+
+/**
+ * A question as it goes out to the person taking the quiz. The answer key is
+ * withheld until the quiz is finished — it used to ride along with every
+ * question from the first render, one DevTools panel away.
+ *
+ * Separate from `Question` on purpose: the server-side paths that grade an answer
+ * read the row straight from the database, and giving them a type where the
+ * answer may be null would invite exactly the null they must never see.
+ */
+export type QuizQuestion = Omit<Question, 'correctAnswer' | 'explanation'> & {
+  correctAnswer: string | null
+  explanation: string | null
 }
 
 export interface Answer {
