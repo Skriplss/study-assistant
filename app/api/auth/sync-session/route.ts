@@ -34,8 +34,10 @@ export async function POST(request: NextRequest) {
     const session = {
       access_token,
       refresh_token,
-      // Clamp to sane bounds — this value becomes the cookie maxAge.
-      expires_in: Math.min(Math.max(Number(expires_in) || 3600, 60), 86400),
+      // Clamp to sane bounds — this value becomes the cookie maxAge. The ceiling
+      // is the access token's own ~1h lifetime: a cookie outliving the JWT inside
+      // it just means the proxy waves through requests the API then 401s.
+      expires_in: Math.min(Math.max(Number(expires_in) || 3600, 60), 3600),
       token_type: 'bearer',
       user: null,
     } as unknown as Session
