@@ -1,131 +1,168 @@
-import { validateMaterialFile } from '@/lib/materials/file-validation'
+import { MaterialService, MaterialValidationError } from '../MaterialService'
 
-const validateFile = validateMaterialFile
+jest.mock('server-only', () => ({}))
 
-describe('validateMaterialFile', () => {
-  it('should validate a valid PDF file', () => {
-    const file = new File(['test'], 'test.pdf', { type: 'application/pdf' })
-    const result = validateFile(file)
-    expect(result.valid).toBe(true)
+/**
+ * The file that used to carry this name tested `validateMaterialFile` and never
+ * touched MaterialService at all — so the module owning uploads, storage paths
+ * and deletion sat at 0% coverage while looking covered. These cover the two
+ * places where getting it wrong costs something real: the path built from
+ * client input, and the deletion that must not lose track of a stored file.
+ */
+
+const storage = {
+  info: jest.fn(),
+  remove: jest.fn(),
+  download: jest.fn(),
+  createSignedUploadUrl: jest.fn(),
+}
+
+let materialRow: Record<string, unknown> | null = null
+let insertError: { message: string } | null = null
+let deleteError: { message: string } | null = null
+const tableCalls: string[] = []
+
+const mockDb = {
+  storage: { from: jest.fn(() => storage) },
+  from: jest.fn((table: string) => {
+    tableCalls.push(table)
+    const deleteChain: Record<string, unknown> = {
+      eq: jest.fn(() => deleteChain),
+      then: (resolve: (v: { error: unknown }) => unknown) =>
+        Promise.resolve({ error: deleteError }).then(resolve),
+    }
+    const chain: Record<string, unknown> = {
+      select: jest.fn(() => chain),
+      eq: jest.fn(() => chain),
+      // insert() is used both bare (tags) and as `.insert().select().single()`
+      // (materials), so it stays in the chain and settles either way.
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+      // delete() is followed by .eq(), so it has to stay in the chain and settle
+      // through `then` rather than resolving on the spot.
+      delete: jest.fn(() => deleteChain),
+      single: jest.fn(() =>
+        Promise.resolve({ data: materialRow, error: null })
+      ),
+      then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+        Promise.resolve({ data: [], error: null }).then(resolve),
+    }
+    return chain
+  }),
+}
+
+jest.mock('@/lib/supabase/server', () => ({
+  getSupabaseAdmin: jest.fn(() => mockDb),
+}))
+
+beforeEach(() => {
+  jest.clearAllMocks()
+  tableCalls.length = 0
+  materialRow = { file_path: 'u1/m1/original.pdf' }
+  insertError = null
+  deleteError = null
+  storage.info.mockResolvedValue({ data: { size: 1024 }, error: null })
+  storage.remove.mockResolvedValue({ error: null })
+})
+
+describe('MaterialService.finalizeUpload — the storage path', () => {
+  it.each([
+    ['directory traversal', '../../../etc/passwd'],
+    ['a path separator', 'u2/m2'],
+    ['a plain word', 'not-a-uuid'],
+    ['an empty string', ''],
+  ])('refuses a materialId containing %s', async (_name, materialId) => {
+    await expect(
+      MaterialService.finalizeUpload('u1', materialId, 'notes.pdf', { title: 'Notes' })
+    ).rejects.toThrow(MaterialValidationError)
+
+    // Nothing may reach storage: the id is interpolated into a path this method
+    // can later remove() from.
+    expect(storage.info).not.toHaveBeenCalled()
   })
 
-  it('should validate a valid TXT file', () => {
-    const file = new File(['test'], 'test.txt', { type: 'text/plain' })
-    const result = validateFile(file)
-    expect(result.valid).toBe(true)
+  it('builds the path from the caller identity, never from the request', async () => {
+    const materialId = '123e4567-e89b-12d3-a456-426614174000'
+
+    await MaterialService.finalizeUpload('u1', materialId, 'notes.pdf', { title: 'Notes' })
+
+    expect(storage.info).toHaveBeenCalledWith(`u1/${materialId}/original.pdf`)
   })
 
-  it('should validate a valid MD file', () => {
-    const file = new File(['test'], 'test.md', { type: 'text/markdown' })
-    const result = validateFile(file)
-    expect(result.valid).toBe(true)
+  it('refuses a file type that is not on the list', async () => {
+    await expect(
+      MaterialService.finalizeUpload(
+        'u1',
+        '123e4567-e89b-12d3-a456-426614174000',
+        'payload.exe',
+        { title: 'Payload' }
+      )
+    ).rejects.toThrow(MaterialValidationError)
   })
 
-  it('should reject files exceeding size limit', () => {
-    const largeContent = new Array(51 * 1024 * 1024).fill('x').join('')
-    const file = new File([largeContent], 'large.pdf', {
-      type: 'application/pdf',
+  it('trusts the size storage reports, not the one the client claimed', async () => {
+    storage.info.mockResolvedValue({
+      data: { size: 999 * 1024 * 1024 },
+      error: null,
     })
-    const result = validateFile(file)
-    expect(result.valid).toBe(false)
-    expect(result.error).toContain('exceeds the maximum limit')
+
+    await expect(
+      MaterialService.finalizeUpload(
+        'u1',
+        '123e4567-e89b-12d3-a456-426614174000',
+        'huge.pdf',
+        { title: 'Huge' }
+      )
+    ).rejects.toThrow(MaterialValidationError)
+
+    // And the object it rejected does not stay in the bucket.
+    expect(storage.remove).toHaveBeenCalled()
   })
 
-  it('should reject unsupported file types', () => {
-    const file = new File(['test'], 'test.docx', {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  it('refuses when the object is not actually in storage', async () => {
+    storage.info.mockResolvedValue({
+      data: null,
+      error: { message: 'not found' },
     })
-    const result = validateFile(file)
-    expect(result.valid).toBe(false)
-    expect(result.error).toContain('not supported')
-  })
 
-  it('should reject files without extension', () => {
-    const file = new File(['test'], 'test', { type: 'application/octet-stream' })
-    const result = validateFile(file)
-    expect(result.valid).toBe(false)
+    await expect(
+      MaterialService.finalizeUpload(
+        'u1',
+        '123e4567-e89b-12d3-a456-426614174000',
+        'notes.pdf',
+        { title: 'Notes' }
+      )
+    ).rejects.toThrow(MaterialValidationError)
   })
 })
 
-describe('validateMaterialFile file size validation', () => {
-  it('should accept file at maximum size limit', () => {
-    const maxContent = new Array(50 * 1024 * 1024).fill('x').join('')
-    const file = new File([maxContent], 'max.pdf', {
-      type: 'application/pdf',
-    })
-    const result = validateFile(file)
-    expect(result.valid).toBe(true)
+describe('MaterialService.deleteMaterial', () => {
+  it('removes the original and the extracted text together', async () => {
+    await MaterialService.deleteMaterial('m1')
+
+    expect(storage.remove).toHaveBeenCalledWith([
+      'u1/m1/original.pdf',
+      'u1/m1/extracted.txt',
+    ])
   })
 
-  it('should accept small files', () => {
-    const file = new File(['small content'], 'small.txt', {
-      type: 'text/plain',
-    })
-    const result = validateFile(file)
-    expect(result.valid).toBe(true)
-  })
-})
+  it('keeps the row when the file could not be removed', async () => {
+    storage.remove.mockResolvedValue({ error: { message: 'network' } })
 
-describe('validateMaterialFile file type validation', () => {
-  it('should handle case-insensitive extensions', () => {
-    const file1 = new File(['test'], 'test.PDF', { type: 'application/pdf' })
-    const file2 = new File(['test'], 'test.Txt', { type: 'text/plain' })
-    const file3 = new File(['test'], 'test.MD', { type: 'text/markdown' })
+    await expect(MaterialService.deleteMaterial('m1')).rejects.toThrow(
+      /could not remove stored files/
+    )
 
-    expect(validateFile(file1).valid).toBe(true)
-    expect(validateFile(file2).valid).toBe(true)
-    expect(validateFile(file3).valid).toBe(true)
+    // Dropping the row here would orphan the object: the only reference to it is
+    // the row being deleted, and the privacy policy says the file goes with it.
+    expect(tableCalls.filter((t) => t === 'study_materials')).toHaveLength(1)
   })
 
-  it('should reject common invalid types', () => {
-    const invalidTypes = [
-      { name: 'test.doc', type: 'application/msword' },
-      { name: 'test.xlsx', type: 'application/vnd.ms-excel' },
-      { name: 'test.zip', type: 'application/zip' },
-    ]
+  it('skips storage entirely for a link material, which has no file', async () => {
+    materialRow = { file_path: null }
 
-    invalidTypes.forEach(({ name, type }) => {
-      const file = new File(['test'], name, { type })
-      const result = validateFile(file)
-      expect(result.valid).toBe(false)
-    })
-  })
+    await MaterialService.deleteMaterial('m1')
 
-  // Images became first-class when text extraction from them shipped; they used
-  // to sit in the rejected list above.
-  it('should accept image types', () => {
-    const imageTypes = [
-      { name: 'test.png', type: 'image/png' },
-      { name: 'test.jpg', type: 'image/jpeg' },
-      { name: 'test.jpeg', type: 'image/jpeg' },
-    ]
-
-    imageTypes.forEach(({ name, type }) => {
-      const file = new File(['test'], name, { type })
-      expect(validateFile(file).valid).toBe(true)
-    })
-  })
-})
-
-describe('MaterialService storage path generation', () => {
-  it('should generate correct storage paths', () => {
-    const userId = 'user-123'
-    const materialId = 'material-456'
-    const expectedPath = `${userId}/${materialId}/original.pdf`
-    
-    // This is implicitly tested in uploadMaterial, but we verify the pattern
-    expect(expectedPath).toMatch(/^user-\d+\/material-\d+\/original\.\w+$/)
-  })
-})
-
-describe('MaterialService upload error handling', () => {
-  it('should handle upload errors gracefully', async () => {
-    // Mock scenario where upload fails
-    const file = new File(['test'], 'test.pdf', { type: 'application/pdf' })
-    
-    // This would need actual Supabase mocks to fully test
-    // For now, we verify the validation works
-    const validation = validateFile(file)
-    expect(validation.valid).toBe(true)
+    expect(storage.remove).not.toHaveBeenCalled()
   })
 })
