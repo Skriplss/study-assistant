@@ -81,9 +81,6 @@ const nextConfig = {
   },
 
   experimental: {
-    serverActions: {
-      bodySizeLimit: '50mb',
-    },
     // Optimize package imports
     optimizePackageImports: ['react-force-graph-2d', 'recharts', 'groq-sdk'],
     // Increase proxy (ex-middleware) body size limit
