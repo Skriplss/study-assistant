@@ -32,6 +32,22 @@ export const SIGNUP_RULE: ThrottleRule = {
 }
 
 /**
+ * Model calls. The provider quota is the app's, not the caller's: Groq's free tier
+ * is 8k tokens per minute for *everyone here at once*, so one account in a loop is
+ * an outage for the rest. Sized so that no real session reaches it — sixty model
+ * calls in an hour is a script, and the block is short because the damage is
+ * spend, not access.
+ *
+ * Parsing is left off this budget on purpose: it is one call per uploaded file,
+ * and importing a folder of forty is a thing people legitimately do in one go.
+ */
+export const AI_RULE: ThrottleRule = {
+  limit: 60,
+  windowMinutes: 60,
+  blockMinutes: 10,
+}
+
+/**
  * The caller's address.
  *
  * `x-forwarded-for` is client-writable in general, so the platform headers come
@@ -122,6 +138,15 @@ export function attemptKeys(
     keys.push(`${action}:email:${email.trim().toLowerCase().slice(0, 254)}`)
   }
   return keys
+}
+
+/**
+ * Key for an action by an already-authenticated caller. No address key here: the
+ * account id is both unforgeable and the thing worth budgeting, and adding an IP
+ * key would punish everyone behind one NAT for a single account's script.
+ */
+export function userKeys(action: string, userId: string): string[] {
+  return [`${action}:user:${userId}`]
 }
 
 /** Just the email half — see the note where login clears its counter. */
