@@ -209,6 +209,16 @@ export class QuizService {
     if (!question || question.quiz_id !== quizId)
       throw new ApiError('Question not found', 404)
 
+    // The status was being selected and never read. Without this, answers stay
+    // writable after scoring: getQuiz hands over the answer key once the quiz is
+    // completed, and re-POSTing each question with it flipped every row to
+    // is_correct while `quizzes.score` kept its old value — results then showed
+    // "N of N correct" next to a score of 0, and the snapshot and review
+    // schedule were already built from the real answers.
+    if (quiz.status === 'completed') {
+      throw new ApiError('This quiz is already finished', 409)
+    }
+
     const questionFormatted = {
       id: question.id,
       quizId: question.quiz_id,

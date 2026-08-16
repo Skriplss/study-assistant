@@ -45,7 +45,15 @@ export class SearchService {
       dbQuery = dbQuery.or(orFilter)
     }
 
-    const { data: materials } = await dbQuery.limit(50)
+    // A dropped error here reads as "no matches" — and this same call is how the
+    // chat picks which of your materials to answer from, so a broken query
+    // silently downgraded chat to "whatever you uploaded last" and answered from
+    // the wrong documents with nothing to show for it.
+    const { data: materials, error } = await dbQuery.limit(50)
+
+    if (error) {
+      throw new Error(`Search failed: ${error.message}`)
+    }
 
     if (!materials) return []
 
